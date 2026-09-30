@@ -225,7 +225,7 @@ onMounted(() => {
 
   try { renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true }) }
   catch { available.value = false; return }
-  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  const reduced = prefersReducedMotion()
   const mobile = window.matchMedia('(pointer: coarse)').matches || window.innerWidth <= 800
   const continuous = !mobile && !reduced
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, mobile ? 1 : 1.75))

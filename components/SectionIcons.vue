@@ -28,7 +28,7 @@ function onSwipe() {
 function select(index: number) {
   const st = sceneTween?.scrollTrigger
   if (st) { scrollTo(st.start + (st.end - st.start) * index / (list.length - 1)); return }
-  track.value?.scrollTo({ left: index * track.value.clientWidth, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' })
+  track.value?.scrollTo({ left: index * track.value.clientWidth, behavior: prefersReducedMotion() ? 'instant' : 'smooth' })
 }
 
 // 제품별 그래픽 도형 (배경 장식)
@@ -45,7 +45,7 @@ onMounted(() => {
     touchLayout.value = true
     return () => { touchLayout.value = false; if (track.value) track.value.scrollLeft = 0 }
   })
-  media.add('(prefers-reduced-motion: no-preference)', () => {
+  media.add(motionMediaQuery(), () => {
     root.value!.classList.add('icons--animated')
     const panels = gsap.utils.toArray<HTMLElement>('.icon-panel')
     const scrollTween = gsap.to(track.value, {

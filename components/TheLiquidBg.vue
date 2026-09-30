@@ -42,7 +42,7 @@ void main() {
 `
 
 onMounted(() => {
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+  if (prefersReducedMotion()) return
   let renderer: THREE.WebGLRenderer
   try {
     renderer = new THREE.WebGLRenderer({ antialias: false, alpha: false })

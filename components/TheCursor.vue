@@ -48,7 +48,7 @@ function burst(x: number, y: number) {
 }
 
 onMounted(() => {
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+  if (prefersReducedMotion()) return
   enabled.value = window.matchMedia('(pointer: fine)').matches
   const html = document.documentElement
 

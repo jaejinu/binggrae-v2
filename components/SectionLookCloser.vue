@@ -41,7 +41,7 @@ watch(productKey, async () => {
   gesture.value=0
   selected.value=productKey.value
   await nextTick()
-  if (!root.value || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+  if (!root.value || prefersReducedMotion()) return
   gsap.fromTo(root.value!.querySelectorAll('.look__q, .look__a'), { y: 20, opacity: 0 }, { y: 0, opacity: 1, stagger: 0.08, duration: 0.5 })
 })
 </script>

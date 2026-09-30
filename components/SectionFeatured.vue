@@ -18,7 +18,7 @@ function selectChapter(index: number) {
 
 onMounted(() => {
   media = gsap.matchMedia()
-  media.add('(prefers-reduced-motion: no-preference)', () => {
+  media.add(motionMediaQuery(), () => {
     pin.value!.classList.add('featured--animated')
     timeline = gsap.timeline({
       scrollTrigger: {

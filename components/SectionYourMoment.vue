@@ -46,7 +46,7 @@ async function make() {
   }
   physics.value?.drop(products[card.value.product].key)
   await nextTick()
-  gsap.fromTo(cardEl.value!, { scale: 0.4, rotate: -20, opacity: 0 }, { scale: 1, rotate: -3, opacity: 1, duration: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 0.7, ease: 'back.out(2)', overwrite: true })
+  gsap.fromTo(cardEl.value!, { scale: 0.4, rotate: -20, opacity: 0 }, { scale: 1, rotate: -3, opacity: 1, duration: prefersReducedMotion() ? 0 : 0.7, ease: 'back.out(2)', overwrite: true })
 }
 
 // 카드를 PNG로 저장 (캔버스에 직접 그림)

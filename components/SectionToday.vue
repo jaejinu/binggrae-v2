@@ -9,7 +9,7 @@ onBeforeUnmount(() => ctx?.revert())
 useSectionColor(root, () => ({ bg: '#8fd3ff' }))
 onMounted(() => {
   ctx = gsap.context(() => {
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+  if (prefersReducedMotion()) return
   gsap.from(root.value!.querySelectorAll('.today__card'), {
     y: 100,
     rotate: (i: number) => [-5, 4, -3, 5, -4][i % 5],

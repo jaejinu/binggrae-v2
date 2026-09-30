@@ -302,5 +302,20 @@
       "KakaoTalk and Instagram in-app browsers not directly tested"
     ],
     "supersedes": "Earlier static mobile Icons / Featured fallback expectations"
+  },
+  "motionPreferenceFix": {
+    "date": "2026-09-30",
+    "cause": "User device report: prefers-reduced-motion enabled; stage intentionally skipped; GSAP button test completed without recorded error.",
+    "behavior": "System setting remains the default. Visitor can explicitly enable site motion, persist choice, and restore system preference.",
+    "validation": [
+      "Chrome and WebKit at 384x783 with reducedMotion=reduce",
+      "Default: hero pin and global 3D omitted",
+      "Explicit opt-in: hero, Icons, Featured pins and global 3D render enabled while OS preference remains reduce",
+      "Hero tagline visible and rendered frame counter advances after scrolling",
+      "Preference survives clean URL navigation",
+      "Restoring system preference disables scenes again",
+      "nuxt typecheck and git diff --check"
+    ],
+    "limits": "Actual-device report establishes the cause; fix validated in emulation, awaiting user device confirmation."
   }
 }

@@ -33,7 +33,7 @@ function ripple(i: number, on: boolean) {
 useSectionColor(root, () => ({ bg: '#fffdf6' }))
 onMounted(() => {
   ctx = gsap.context(() => {
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+  if (prefersReducedMotion()) return
   gsap.from(root.value!.querySelectorAll('.story'), {
     y: 60,
     opacity: 0,

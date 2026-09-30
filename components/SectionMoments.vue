@@ -16,7 +16,7 @@ watch(active, (i: number) => blip(1 + i * 0.12))
 
 watch(active, async () => {
   await nextTick()
-  if (!root.value || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+  if (!root.value || prefersReducedMotion()) return
   ctx?.add(() => {
   gsap.fromTo(root.value!.querySelector('.moments__art'), { scale: 0.6, rotate: -14, y: 40 }, { scale: 1, rotate: 0, y: 0, duration: 0.7, ease: 'back.out(2)' })
   gsap.fromTo(root.value!.querySelectorAll('.moments__detail > *'), { y: 16, opacity: 0 }, { y: 0, opacity: 1, stagger: 0.06, duration: 0.4, overwrite: true })
@@ -25,7 +25,7 @@ watch(active, async () => {
 
 onMounted(() => {
   ctx = gsap.context(() => {
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+  if (prefersReducedMotion()) return
   gsap.from(root.value!.querySelectorAll('.moments__list li'), {
     x: -60,
     opacity: 0,

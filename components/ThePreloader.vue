@@ -9,7 +9,7 @@ const root = ref<HTMLElement>()
 const ready = ref(false)
 const starting = ref(false)
 let ctx: gsap.Context | undefined
-const reduced = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches
+const reduced = () => prefersReducedMotion()
 
 onMounted(() => {
   if (reduced()) { ready.value = true; return }

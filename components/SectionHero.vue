@@ -40,7 +40,7 @@ function computeShifts(els: HTMLElement[]) {
 }
 
 onMounted(() => {
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+  if (prefersReducedMotion()) return
   ctx = gsap.context(() => {
     const els = gsap.utils.toArray<HTMLElement>('.hero__token')
     let shifts = computeShifts(els)
@@ -76,7 +76,7 @@ watch(
   () => props.started,
   (on: boolean) => {
     if (!on) return
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    if (prefersReducedMotion()) return
     ctx?.add(() => {
     gsap.to(root.value!.querySelectorAll('.hero__token'), { yPercent: 0, opacity: 1, duration: 0.7, stagger: { each: 0.02, from: 'random' }, ease: 'back.out(1.6)' })
     gsap.from(root.value!.querySelectorAll('.hero__intro > *'), { scale: 0.4, opacity: 0, delay: 0.5, stagger: 0.1, ease: 'back.out(2)' })
@@ -248,9 +248,9 @@ onBeforeUnmount(() => ctx?.revert())
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .hero__schedule { opacity: .08; }
-  .hero__product { transform: none; }
-  .hero__spark { display: none; }
-  .hero__intro { z-index: 1; }
+  html:not([data-motion="full"]) .hero__schedule { opacity: .08; }
+  html:not([data-motion="full"]) .hero__product { transform: none; }
+  html:not([data-motion="full"]) .hero__spark { display: none; }
+  html:not([data-motion="full"]) .hero__intro { z-index: 1; }
 }
 </style>

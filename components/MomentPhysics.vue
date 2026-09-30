@@ -22,7 +22,7 @@ function drop(key?: ProductKey) {
 defineExpose({ drop })
 
 onMounted(async () => {
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { unavailable.value = true; return }
+  if (prefersReducedMotion()) { unavailable.value = true; return }
   const el = host.value!
   const mobile = window.matchMedia('(pointer: coarse)').matches || window.innerWidth <= 800
   let dirty = true

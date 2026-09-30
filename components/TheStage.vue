@@ -21,7 +21,7 @@ let disposed = false
 
 onMounted(async () => {
   const status = (value: string) => { if (canvasHost.value) canvasHost.value.dataset.status = value }
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { status('모션 줄이기로 생략'); return }
+  if (prefersReducedMotion()) { status('모션 줄이기로 생략'); return }
   status('초기화 중')
   const mobile = window.matchMedia('(pointer: coarse)').matches || window.innerWidth <= 800
 
