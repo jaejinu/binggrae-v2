@@ -1,0 +1,7 @@
+services:
+  web:
+    build: .
+    image: binggrae-moment:local
+    ports:
+      - "${PORT:-3300}:3000"
+    restart: unless-stopped
