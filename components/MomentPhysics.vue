@@ -26,6 +26,7 @@ onMounted(async () => {
   if (prefersReducedMotion()) { unavailable.value = true; return }
   const el = host.value!
   const mobile = window.matchMedia('(pointer: coarse)').matches || window.innerWidth <= 800
+  const itemSize = mobile ? 1 : SIZE
   let dirty = true
   let lastInteraction = performance.now()
   let renderer: THREE.WebGLRenderer
@@ -130,7 +131,7 @@ onMounted(async () => {
       if (disposed) return
       const texture = new THREE.CanvasTexture(canvas)
       texture.colorSpace = THREE.SRGBColorSpace
-      const scale = SIZE / Math.max(canvas.width, canvas.height)
+      const scale = itemSize / Math.max(canvas.width, canvas.height)
       const width = canvas.width * scale, height = canvas.height * scale
       const geometry = new THREE.PlaneGeometry(width, height)
       const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, alphaTest: .05, side: THREE.DoubleSide, toneMapped: false })
@@ -156,7 +157,7 @@ onMounted(async () => {
       return { key, body, obj, sticker: true, dispose: () => {} }
     }
     const iconKey = key as typeof keys[number]
-    const rig = makeRig(gltfs[keys.indexOf(iconKey)]!, iconKey, { size: SIZE, tilt: false, cloneMaterials: true })
+    const rig = makeRig(gltfs[keys.indexOf(iconKey)]!, iconKey, { size: itemSize, tilt: false, cloneMaterials: true })
     rig.group.traverse((o) => ((o as THREE.Mesh).isMesh ? ((o as THREE.Mesh).castShadow = true) : null))
     // 충돌체: 모델 크기에 맞춘 원기둥/상자
     const box = new THREE.Box3().setFromObject(rig.group)
@@ -186,7 +187,7 @@ onMounted(async () => {
     scene.add(it.obj)
     gsap.from(it.obj.scale, { x: 0.3, y: 0.3, z: 0.3, duration: 0.4, ease: 'back.out(2)' })
     items.push(it)
-    if (items.length > (mobile ? 8 : MAX)) {
+    if (items.length > (mobile ? 20 : MAX)) {
       const old = items.shift()!
       world.removeBody(old.body)
       gsap.to(old.obj.scale, { x: 0, y: 0, z: 0, duration: 0.3, onComplete: () => { scene.remove(old.obj); old.dispose() } })
@@ -220,7 +221,7 @@ onMounted(async () => {
   const onLeave = () => { pusher.position.set(0, -50, 0); pusher.velocity.setZero() }
   const onClick = (e: PointerEvent) => {
     const p = toWorld(e)
-    dropImpl?.(selected.value === 'random' ? undefined : selected.value, p ? THREE.MathUtils.clamp(p.x, -halfW + 0.6, halfW - 0.6) : undefined)
+    dropImpl?.(undefined, p ? THREE.MathUtils.clamp(p.x, -halfW + 0.6, halfW - 0.6) : undefined)
   }
   el.addEventListener('pointermove', onMove)
   el.addEventListener('pointerleave', onLeave)
@@ -233,8 +234,7 @@ onMounted(async () => {
     visible = entry.isIntersecting
     if (visible && !started) {
       started = true
-      const initial = mobile ? ['bananaMilk', 'melona', 'together', 'kkotgerang', 'excellent', 'bbangtttoa', 'ttaom', 'jucyCool'] : availableKeys
-      initial.filter(k => availableKeys.includes(k)).forEach((k, i) => gsap.delayedCall(0.2 * i, () => dropImpl?.(k)))
+      availableKeys.forEach((k, i) => gsap.delayedCall(0.2 * i, () => dropImpl?.(k)))
     }
   })
   io.observe(el)
@@ -278,7 +278,7 @@ onBeforeUnmount(() => { disposed = true; cleanup?.() })
   <div v-show="!unavailable" class="phys card">
     <p class="phys__hint body-m">
       <span class="kicker">오늘의 틈 모으기</span>
-      {{ ready ? '16가지 즐거움. 제품을 골라 담거나 화면을 눌러 모아보세요.' : '불러오는 중…' }}
+      {{ ready ? '16가지 즐거움이 한자리에. 화면을 누르면 랜덤으로 하나 더!' : '불러오는 중…' }}
     </p>
     <div ref="host" class="phys__canvas" data-cursor="PUSH" />
     <div class="phys__controls">

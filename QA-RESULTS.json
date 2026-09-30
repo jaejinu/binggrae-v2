@@ -330,6 +330,17 @@
     ],
     "target": "https://binggrae-moment.vercel.app"
   },
+  "collectionInitial16": {
+    "date": "2026-09-30",
+    "validation": [
+      "Chrome desktop 1440px, Chrome mobile 384px, WebKit mobile 384px: all 16 unique products present initially",
+      "Real canvas clicks/taps with controlled random values exercise every product, independent of selected dropdown value",
+      "Add button retains explicitly selected product; capacity 20 mobile / 22 desktop",
+      "Mobile pile sleeps, canvas pixels remain stable, and tap wakes physics",
+      "No page errors or horizontal overflow; nuxt typecheck and git diff --check pass"
+    ],
+    "limitations": "Browser emulation, not physical-device coverage"
+  },
   "todayAndCollection": {
     "date": "2026-09-30",
     "scope": [
