@@ -151,14 +151,23 @@ onBeforeUnmount(() => ctx?.revert())
   .featured__pin {
     grid-template-columns: 1fr;
     align-content: center;
-    gap: 16px;
+    gap: 12px;
   }
+  .featured__left {
+    gap: 12px;
+  }
+  .featured__left h2 {
+    font-size: clamp(34px, 9vw, 56px);
+  }
+  /* 모바일에서도 3D 단지 자리를 남겨 둔다 (제목과 챕터 사이) */
   .featured__jar {
-    display: none;
+    justify-self: center;
+    width: auto;
+    height: clamp(120px, 22svh, 220px);
   }
   .featured__chapters li {
     grid-template-columns: 6.5em 1fr;
-    padding: 6px 10px;
+    padding: 5px 10px;
   }
 }
 </style>
