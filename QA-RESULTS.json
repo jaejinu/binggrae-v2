@@ -317,5 +317,17 @@
       "nuxt typecheck and git diff --check"
     ],
     "limits": "Actual-device report establishes the cause; fix validated in emulation, awaiting user device confirmation."
+  },
+  "motionDefaultUpdate": {
+    "date": "2026-09-30",
+    "behavior": "At user request, new visits enable full site motion automatically, including with OS reduced motion enabled. Explicit stored system choice is retained.",
+    "validation": [
+      "Fresh Chrome and WebKit mobile contexts, OS reducedMotion=reduce",
+      "Hero, Icons and Featured pin scenes initialized without opt-in",
+      "Hero tagline revealed and 3D frames rendered after scroll",
+      "Explicit system preference disables scenes and persists on clean URL",
+      "nuxt typecheck and git diff --check"
+    ],
+    "target": "https://binggrae-moment.vercel.app"
   }
 }

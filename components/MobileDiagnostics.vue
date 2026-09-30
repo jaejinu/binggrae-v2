@@ -18,7 +18,7 @@ function snapshot() {
   report.value = [
     '모바일 진단 D2 · 개인정보 전송 없음',
     `모션 줄이기: ${matchMedia('(prefers-reduced-motion: reduce)').matches ? '켜짐' : '꺼짐'}`,
-    `사이트 연출: ${prefersReducedMotion() ? '제한' : '켜짐'}${document.documentElement.dataset.motion === 'full' ? ' (직접 선택)' : ''}`,
+    `사이트 연출: ${prefersReducedMotion() ? '제한' : '켜짐'}${document.documentElement.dataset.motion === 'full' ? ' (사이트 설정)' : ''}`,
     `터치: ${navigator.maxTouchPoints} / 화면: ${innerWidth}×${innerHeight}`,
     `스크롤: ${Math.round(scrollY)} / GSAP: ${gsap.version} / 트리거: ${triggers.length}`,
     `현재 연출: ${active.join(', ') || '없음'}`,

@@ -1,4 +1,4 @@
-// Respect the OS preference unless the visitor explicitly enables this site's motion.
+// Site motion is enabled by default; visitors may choose to follow their OS preference.
 export function prefersReducedMotion(): boolean {
   if (typeof window === 'undefined') return false
   return document.documentElement.dataset.motion !== 'full'
