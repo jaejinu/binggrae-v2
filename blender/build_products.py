@@ -1,18 +1,22 @@
 """
-빙그레할 틈 — 제품 3D 빌드 스크립트 (Blender 5.x)
+빙그레할 틈 — 제품 3D 빌드 스크립트 (Blender 5.x, Cycles)
 
-형태만 단순화한 오리지널 모델(로고·실제 패키지 그래픽 없음)을 만들고
-  - public/models/<slug>.glb   : LOOK CLOSER 인터랙티브 3D (파트 분리, explode 방향 포함)
-  - public/products/<slug>.png : 사이트 전역 제품 이미지 (외곽선 렌더, 투명 배경)
-  - blender/products.blend     : 편집용 원본
-을 생성한다.
+형태·재질만 사실적으로 만든 오리지널 모델(로고·실제 패키지 그래픽 없음)을 생성한다.
+  - public/products/<slug>.png : Cycles 실사 렌더 (투명 배경 + 접지 그림자)
+  - public/models/<slug>.glb   : LOOK CLOSER 인터랙티브 3D (절차적 질감을 텍스처로 베이킹, 파트 분리, explode extras)
+  - blender/products.blend     : 편집용 원본 (절차적 재질 그대로)
 
 실행 (binggrae/ 에서):
   /Applications/Blender.app/Contents/MacOS/Blender -b --factory-startup --python blender/build_products.py
+옵션 (환경변수):
+  ONLY=bravo            특정 제품만
+  SKIP_GLB=1            렌더만 (베이킹/내보내기 생략)
+  SAMPLES=128           렌더 샘플 수
 """
 
 import math
 import os
+import random
 
 import bmesh
 import bpy
@@ -24,43 +28,154 @@ PRODUCTS = os.path.join(ROOT, "public", "products")
 os.makedirs(MODELS, exist_ok=True)
 os.makedirs(PRODUCTS, exist_ok=True)
 
+ONLY = os.environ.get("ONLY")
+SKIP_GLB = os.environ.get("SKIP_GLB") == "1"
+SAMPLES = int(os.environ.get("SAMPLES", "128"))
+random.seed(7)
+
 
 # ---------------------------------------------------------------------------
-# helpers
+# material helpers
 # ---------------------------------------------------------------------------
 
-def srgb_to_linear(c):
-    return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
-
-
-def material(name, hex_color, roughness=0.55):
-    m = bpy.data.materials.new(name)
+def lin(hex_color):
     h = hex_color.lstrip("#")
-    rgb = [srgb_to_linear(int(h[i:i + 2], 16) / 255) for i in (0, 2, 4)]
-    try:
-        m.use_nodes = True
-    except Exception:
-        pass
-    bsdf = m.node_tree.nodes.get("Principled BSDF")
-    bsdf.inputs["Base Color"].default_value = (*rgb, 1)
-    bsdf.inputs["Roughness"].default_value = roughness
-    if "Specular IOR Level" in bsdf.inputs:
-        bsdf.inputs["Specular IOR Level"].default_value = 0.25
-    m.diffuse_color = (*rgb, 1)
-    return m
 
+    def f(c):
+        return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
+
+    return (*[f(int(h[i:i + 2], 16) / 255) for i in (0, 2, 4)], 1.0)
+
+
+class Mat:
+    """Principled BSDF 기반 재질 빌더. 절차적 노드가 있으면 bake 대상으로 표시한다."""
+
+    def __init__(self, name, color, roughness=0.5, **inputs):
+        self.m = bpy.data.materials.new(name)
+        try:
+            self.m.use_nodes = True
+        except Exception:
+            pass
+        self.nt = self.m.node_tree
+        self.bsdf = self.nt.nodes["Principled BSDF"]
+        self.set("Base Color", lin(color))
+        self.set("Roughness", roughness)
+        for k, v in inputs.items():
+            self.set(k.replace("_", " "), v)
+        self.m.diffuse_color = lin(color)
+        self.m["bake"] = False
+        self._coord = None
+
+    def set(self, name, value):
+        if name in self.bsdf.inputs:
+            self.bsdf.inputs[name].default_value = value
+
+    def node(self, kind, **props):
+        n = self.nt.nodes.new(kind)
+        for k, v in props.items():
+            setattr(n, k, v)
+        return n
+
+    def coord(self):
+        if self._coord is None:
+            self._coord = self.node("ShaderNodeTexCoord").outputs["Object"]
+        return self._coord
+
+    def link(self, a, b):
+        self.nt.links.new(a, b)
+
+    def color_noise(self, c1, c2, scale=6.0, detail=4.0):
+        """두 색 사이를 노이즈로 섞어 얼룩/구운 색 변화를 준다."""
+        self.m["bake"] = True
+        noise = self.node("ShaderNodeTexNoise")
+        noise.inputs["Scale"].default_value = scale
+        noise.inputs["Detail"].default_value = detail
+        self.link(self.coord(), noise.inputs["Vector"])
+        ramp = self.node("ShaderNodeValToRGB")
+        ramp.color_ramp.elements[0].position = 0.35
+        ramp.color_ramp.elements[0].color = lin(c1)
+        ramp.color_ramp.elements[1].position = 0.7
+        ramp.color_ramp.elements[1].color = lin(c2)
+        self.link(noise.outputs["Fac"], ramp.inputs["Fac"])
+        self.link(ramp.outputs["Color"], self.bsdf.inputs["Base Color"])
+        return ramp
+
+    def bump(self, height_socket, strength=0.3, distance=0.02):
+        self.m["bake"] = True
+        b = self.node("ShaderNodeBump")
+        b.inputs["Strength"].default_value = strength
+        if "Distance" in b.inputs:
+            b.inputs["Distance"].default_value = distance
+        self.link(height_socket, b.inputs["Height"])
+        self.link(b.outputs["Normal"], self.bsdf.inputs["Normal"])
+        return b
+
+    def noise_bump(self, scale=40.0, strength=0.15, detail=6.0):
+        n = self.node("ShaderNodeTexNoise")
+        n.inputs["Scale"].default_value = scale
+        n.inputs["Detail"].default_value = detail
+        self.link(self.coord(), n.inputs["Vector"])
+        return self.bump(n.outputs["Fac"], strength)
+
+    def voronoi_bump(self, scale=9.0, strength=0.35):
+        v = self.node("ShaderNodeTexVoronoi")
+        v.inputs["Scale"].default_value = scale
+        v.feature = "F1"
+        self.link(self.coord(), v.inputs["Vector"])
+        return self.bump(v.outputs["Distance"], strength)
+
+    def waffle(self, scale=7.0, strength=0.6, dark="#9a5a22"):
+        """45도로 교차하는 홈 → 와플콘 격자. 홈 부분은 어둡게."""
+        self.m["bake"] = True
+        mins = []
+        for angle in (math.radians(45), math.radians(-45)):
+            mapping = self.node("ShaderNodeMapping")
+            mapping.inputs["Rotation"].default_value = (0, angle, 0)
+            self.link(self.coord(), mapping.inputs["Vector"])
+            wave = self.node("ShaderNodeTexWave", wave_type="BANDS", bands_direction="X")
+            wave.inputs["Scale"].default_value = scale
+            wave.inputs["Distortion"].default_value = 0.0
+            self.link(mapping.outputs["Vector"], wave.inputs["Vector"])
+            mins.append(wave.outputs["Fac"])
+        mn = self.node("ShaderNodeMath", operation="MINIMUM")
+        self.link(mins[0], mn.inputs[0])
+        self.link(mins[1], mn.inputs[1])
+        self.bump(mn.outputs["Value"], strength)
+        ramp = self.node("ShaderNodeValToRGB")
+        ramp.color_ramp.elements[0].position = 0.08
+        ramp.color_ramp.elements[0].color = lin(dark)
+        ramp.color_ramp.elements[1].position = 0.3
+        ramp.color_ramp.elements[1].color = self.bsdf.inputs["Base Color"].default_value
+        self.link(mn.outputs["Value"], ramp.inputs["Fac"])
+        self.link(ramp.outputs["Color"], self.bsdf.inputs["Base Color"])
+
+
+# ---------------------------------------------------------------------------
+# geometry helpers
+# ---------------------------------------------------------------------------
 
 def place(obj, coll, mat=None, smooth=True):
     for c in list(obj.users_collection):
         c.objects.unlink(obj)
     coll.objects.link(obj)
-    if mat is not None:
+    if mat is not None and obj.type in {"MESH", "CURVE"}:
         obj.data.materials.clear()
-        obj.data.materials.append(mat)
+        obj.data.materials.append(mat.m if isinstance(mat, Mat) else mat)
     if smooth and obj.type == "MESH":
         for p in obj.data.polygons:
             p.use_smooth = True
     return obj
+
+
+def mod(obj, kind, **props):
+    m = obj.modifiers.new(kind.lower(), kind)
+    for k, v in props.items():
+        setattr(m, k, v)
+    return m
+
+
+def subsurf(obj, levels=2):
+    return mod(obj, "SUBSURF", levels=levels, render_levels=levels)
 
 
 def explode(obj, vec_yup):
@@ -68,8 +183,12 @@ def explode(obj, vec_yup):
     obj["explode"] = list(vec_yup)
 
 
-def catmull(points, n=6):
-    """프로파일을 부드럽게 보간 (Catmull-Rom)."""
+def parent_keep(child, parent):
+    child.parent = parent
+    child.matrix_parent_inverse = parent.matrix_world.inverted()
+
+
+def catmull(points, n=8):
     pts = [points[0]] + points + [points[-1]]
     out = []
     for i in range(1, len(pts) - 2):
@@ -82,7 +201,7 @@ def catmull(points, n=6):
     return out
 
 
-def lathe(name, profile, coll, mat, steps=72, smooth_n=6):
+def lathe(name, profile, coll, mat, steps=96, smooth_n=8):
     prof = catmull(profile, smooth_n) if smooth_n else profile
     bm = bmesh.new()
     verts = [bm.verts.new((max(r, 0.0), 0.0, z)) for r, z in prof]
@@ -93,15 +212,32 @@ def lathe(name, profile, coll, mat, steps=72, smooth_n=6):
     me = bpy.data.meshes.new(name)
     bm.to_mesh(me)
     bm.free()
-    obj = bpy.data.objects.new(name, me)
-    return place(obj, coll, mat)
+    return place(bpy.data.objects.new(name, me), coll, mat)
 
 
-def add(op, coll, mat, name, smooth=True, **kw):
+def prim(op, coll, mat, name, smooth=True, **kw):
     getattr(bpy.ops.mesh, op)(**kw)
     obj = bpy.context.active_object
     obj.name = name
     return place(obj, coll, mat, smooth)
+
+
+def join(objs, name):
+    bpy.ops.object.select_all(action="DESELECT")
+    for o in objs:
+        o.select_set(True)
+    bpy.context.view_layer.objects.active = objs[0]
+    bpy.ops.object.join()
+    o = bpy.context.active_object
+    o.name = name
+    return o
+
+
+def cloud_texture(name, size=0.4, depth=2):
+    t = bpy.data.textures.new(name, "CLOUDS")
+    t.noise_scale = size
+    t.noise_depth = depth
+    return t
 
 
 def new_collection(name):
@@ -111,73 +247,110 @@ def new_collection(name):
 
 
 # ---------------------------------------------------------------------------
-# products (Blender Z-up / 정면 = -Y 방향)
+# products (Blender Z-up, 정면 = -Y)
 # ---------------------------------------------------------------------------
 
 def build_banana_milk(coll):
-    yellow = material("bm_body", "#ffd43b", 0.45)
-    cream = material("bm_cap", "#fff6e0")
-    foil = material("bm_foil", "#d9d9d9", 0.3)
-    body = lathe("body", [(0, -1.3), (0.62, -1.28), (0.94, -1.02), (1.04, -0.45), (0.97, 0.12), (0.74, 0.52), (0.47, 0.78), (0.42, 1.0)], coll, yellow)
-    cap = add("primitive_cylinder_add", coll, cream, "cap", vertices=64, radius=0.46, depth=0.22, location=(0, 0, 1.1))
-    lid = add("primitive_cylinder_add", coll, foil, "foil", vertices=64, radius=0.43, depth=0.03, location=(0, 0, 1.23))
-    band = add("primitive_torus_add", coll, cream, "band", major_radius=1.03, minor_radius=0.045, major_segments=96, minor_segments=12, location=(0, 0, -0.35))
+    plastic = Mat("bm_plastic", "#ffc81a", 0.24, Subsurface_Weight=0.12, Subsurface_Scale=0.15, Coat_Weight=0.35, Coat_Roughness=0.06)
+    plastic.set("Subsurface Radius", (1.0, 0.6, 0.1))
+    plastic.noise_bump(scale=3.0, strength=0.04)
+    cap_m = Mat("bm_cap", "#f5f2ea", 0.38, Subsurface_Weight=0.1)
+    cap_m.noise_bump(scale=60, strength=0.05)
+    foil_m = Mat("bm_foil", "#eceef1", 0.32, Metallic=0.65)
+    foil_m.noise_bump(scale=26, strength=0.25)
+
+    body = lathe("body", [(0, -1.3), (0.55, -1.29), (0.86, -1.18), (0.99, -0.9), (1.04, -0.45), (0.99, 0.08), (0.8, 0.48), (0.55, 0.74), (0.45, 0.88), (0.43, 1.0)], coll, plastic)
+    mod(body, "SOLIDIFY", thickness=0.02)
+    subsurf(body, 1)
+    # 몸통 가운데의 얕은 띠 (패키지 성형선)
+    ridge = prim("primitive_torus_add", coll, plastic, "ridge", major_radius=1.035, minor_radius=0.022, major_segments=128, minor_segments=12, location=(0, 0, -0.42))
+    parent_keep(ridge, body)
+    cap = lathe("cap", [(0, 1.24), (0.41, 1.24), (0.46, 1.2), (0.47, 1.0), (0.45, 0.98)], coll, cap_m, smooth_n=4)
+    subsurf(cap, 1)
+    foil = prim("primitive_cylinder_add", coll, foil_m, "foil", vertices=96, radius=0.45, depth=0.012, location=(0, 0, 1.25))
+    mod(foil, "BEVEL", width=0.004, segments=2)
     explode(body, (0, 0, 0))
     explode(cap, (0, 0.7, 0))
-    explode(lid, (0, 1.2, 0))
-    explode(band, (0, -0.25, 0))
+    explode(foil, (0, 1.25, 0))
 
 
 def build_yoplait(coll):
-    cream = material("yp_cup", "#fff6e0")
-    pink = material("yp_band", "#ff9ebd")
-    yogurt = material("yp_yogurt", "#ffc2d6", 0.3)
-    lidm = material("yp_lid", "#ff5f8f", 0.35)
-    cup = lathe("cup", [(0, -1.1), (0.72, -1.1), (0.95, 0.9), (0.92, 0.95)], coll, cream, smooth_n=0)
-    rim = add("primitive_torus_add", coll, cream, "rim", major_radius=0.95, minor_radius=0.05, major_segments=96, minor_segments=12, location=(0, 0, 0.9))
-    rim.parent = cup
-    band = add("primitive_cone_add", coll, pink, "band", vertices=96, radius1=0.84, radius2=0.9, depth=0.5, location=(0, 0, 0.05), end_fill_type="NOTHING")
-    band.parent = cup
-    yog = add("primitive_cylinder_add", coll, yogurt, "yogurt", vertices=64, radius=0.9, depth=0.08, location=(0, 0, 0.74))
-    lid = add("primitive_cylinder_add", coll, lidm, "lid", vertices=64, radius=1.0, depth=0.04, location=(0.1, 0, 1.0), rotation=(0, math.radians(-12), 0))
-    # 숟가락: 손잡이 + 볼을 하나로 합침
-    add("primitive_cube_add", coll, cream, "spoon", size=1, location=(0, 0, 0), scale=(0.12, 0.05, 1.4))
-    handle = bpy.context.active_object
-    add("primitive_uv_sphere_add", coll, cream, "spoon_bowl", segments=32, ring_count=16, radius=1, location=(0, 0, 0.8), scale=(0.22, 0.08, 0.29))
-    bowl = bpy.context.active_object
+    cup_m = Mat("yp_cup", "#f7f4ee", 0.32, Subsurface_Weight=0.15, Subsurface_Scale=0.1, Coat_Weight=0.2)
+    band_m = Mat("yp_band", "#ff8fb3", 0.45)
+    band_m.color_noise("#ff6f9f", "#ff86b0", scale=2.0)
+    yog_m = Mat("yp_yogurt", "#fbe4ea", 0.32, Subsurface_Weight=0.6, Subsurface_Scale=0.15)
+    yog_m.noise_bump(scale=8, strength=0.12)
+    lid_m = Mat("yp_lid", "#e79ab4", 0.3, Metallic=0.5)
+    lid_m.noise_bump(scale=22, strength=0.4)
+    spoon_m = Mat("yp_spoon", "#fbfaf7", 0.3, Coat_Weight=0.3)
+
+    cup = lathe("cup", [(0, -1.1), (0.7, -1.1), (0.74, -1.06), (0.94, 0.9)], coll, cup_m, smooth_n=0)
+    mod(cup, "SOLIDIFY", thickness=0.025)
+    subsurf(cup, 1)
+    rim = prim("primitive_torus_add", coll, cup_m, "rim", major_radius=0.95, minor_radius=0.045, major_segments=128, minor_segments=16, location=(0, 0, 0.9))
+    parent_keep(rim, cup)
+    band = prim("primitive_cone_add", coll, band_m, "band", vertices=128, radius1=0.845, radius2=0.905, depth=0.55, location=(0, 0, 0.1), end_fill_type="NOTHING")
+    parent_keep(band, cup)
+
+    bpy.ops.mesh.primitive_circle_add(vertices=96, radius=0.9, fill_type="NGON", location=(0, 0, 0.74))
+    yog = place(bpy.context.active_object, coll, yog_m)
+    yog.name = "yogurt"
+    bpy.ops.object.mode_set(mode="EDIT")
+    bpy.ops.mesh.poke()
+    bpy.ops.mesh.subdivide(number_cuts=6)
+    bpy.ops.object.mode_set(mode="OBJECT")
+    tex = cloud_texture("yog_clouds", 0.35)
+    mod(yog, "DISPLACE", texture=tex, strength=0.06, mid_level=0.5)
+    mod(yog, "SOLIDIFY", thickness=0.05)
+
+    bpy.ops.mesh.primitive_grid_add(x_subdivisions=48, y_subdivisions=48, size=2.0, location=(0, 0, 0))
+    lid = place(bpy.context.active_object, coll, lid_m)
+    lid.name = "lid"
+    # 원형으로 잘라내기
+    bm = bmesh.new()
+    bm.from_mesh(lid.data)
+    bmesh.ops.delete(bm, geom=[v for v in bm.verts if Vector((v.co.x, v.co.y)).length > 1.0], context="VERTS")
+    bm.to_mesh(lid.data)
+    bm.free()
+    mod(lid, "SIMPLE_DEFORM", deform_method="BEND", angle=math.radians(55), deform_axis="Y")
+    mod(lid, "SOLIDIFY", thickness=0.01)
+    lid.location = (0.35, 0.05, 1.05)
+    lid.rotation_euler = (0, math.radians(-18), 0)
+
+    handle = prim("primitive_cube_add", coll, spoon_m, "spoon", size=1, location=(0, 0, 0), scale=(0.11, 0.035, 1.35))
+    mod(handle, "BEVEL", width=0.02, segments=3)
+    bowl = prim("primitive_uv_sphere_add", coll, spoon_m, "spoon_bowl", segments=48, ring_count=24, radius=1, location=(0, 0, 0.78), scale=(0.21, 0.06, 0.28))
     bpy.ops.object.select_all(action="DESELECT")
     handle.select_set(True)
-    bowl.select_set(True)
     bpy.context.view_layer.objects.active = handle
-    bpy.ops.object.join()
-    spoon = bpy.context.active_object
-    spoon.location = (0.62, 0, 1.15)
-    spoon.rotation_euler = (0, math.radians(28), 0)
+    bpy.ops.object.modifier_apply(modifier="bevel")
+    spoon = join([handle, bowl], "spoon")
+    subsurf(spoon, 1)
+    spoon.location = (-0.45, 0.1, 1.05)
+    spoon.rotation_euler = (math.radians(8), math.radians(-24), 0)
+
     explode(cup, (0, 0, 0))
-    explode(yog, (0, 0.5, 0))
-    explode(lid, (0, 1.2, 0))
-    explode(spoon, (1.0, 0.4, 0))
+    explode(yog, (0, 0.55, 0))
+    explode(lid, (0.2, 1.3, 0))
+    explode(spoon, (-1.0, 0.5, 0))
 
 
 def fish_outline():
-    def bez(p0, p1, p2, p3, n=28):
-        pts = []
-        for i in range(n):
-            t = i / n
-            a = (1 - t) ** 3
-            b = 3 * (1 - t) ** 2 * t
-            c = 3 * (1 - t) * t ** 2
-            d = t ** 3
-            pts.append((a * p0[0] + b * p1[0] + c * p2[0] + d * p3[0], a * p0[1] + b * p1[1] + c * p2[1] + d * p3[1]))
-        return pts
+    def bez(p0, p1, p2, p3, n=32):
+        return [
+            (
+                (1 - t) ** 3 * p0[0] + 3 * (1 - t) ** 2 * t * p1[0] + 3 * (1 - t) * t ** 2 * p2[0] + t ** 3 * p3[0],
+                (1 - t) ** 3 * p0[1] + 3 * (1 - t) ** 2 * t * p1[1] + 3 * (1 - t) * t ** 2 * p2[1] + t ** 3 * p3[1],
+            )
+            for t in (i / n for i in range(n))
+        ]
 
     pts = []
-    pts += bez((-1.4, 0), (-1.2, 0.8), (0.2, 1.0), (0.8, 0.35))
-    pts += [(0.8, 0.35)] + [(0.8 + (1.4 - 0.8) * k / 6, 0.35 + (0.8 - 0.35) * k / 6) for k in range(1, 6)]
-    pts += bez((1.4, 0.8), (1.3, 0.3), (1.3, -0.3), (1.4, -0.8))
-    pts += [(1.4, -0.8)] + [(1.4 + (0.8 - 1.4) * k / 6, -0.8 + (-0.35 + 0.8) * k / 6) for k in range(1, 6)]
-    pts += bez((0.8, -0.35), (0.2, -1.0), (-1.2, -0.8), (-1.4, 0))
-    # 중복 점 제거
+    pts += bez((-1.4, 0), (-1.25, 0.82), (0.25, 1.02), (0.82, 0.34))
+    pts += [(0.82 + 0.58 * k / 8, 0.34 + 0.48 * k / 8) for k in range(8)]
+    pts += bez((1.4, 0.82), (1.28, 0.3), (1.28, -0.3), (1.4, -0.82))
+    pts += [(1.4 - 0.58 * k / 8, -0.82 + 0.48 * k / 8) for k in range(8)]
+    pts += bez((0.82, -0.34), (0.25, -1.02), (-1.25, -0.82), (-1.4, 0))
     clean = []
     for p in pts:
         if not clean or (abs(p[0] - clean[-1][0]) + abs(p[1] - clean[-1][1])) > 1e-4:
@@ -185,105 +358,138 @@ def fish_outline():
     return clean
 
 
-def fish_slab(name, coll, mat, thickness, y, sx=1.0, sz=1.0, bevel=0.05):
-    """정면(-Y)을 향한 붕어 모양 판. XZ 평면 윤곽을 Y 방향으로 두께를 준다."""
+def fish_slab(name, coll, mat, thickness, y, sx=1.0, sz=1.0, puff=True):
+    """바닥에 눕힌 도톰한 붕어 모양. 윤곽을 위로 두께만큼 밀어내고 둥글게 부풀린다."""
     bm = bmesh.new()
-    verts = [bm.verts.new((x * sx, 0, z * sz)) for x, z in fish_outline()]
+    verts = [bm.verts.new((x * sx, z * sz, 0)) for x, z in fish_outline()]
     face = bm.faces.new(verts)
-    ext = bmesh.ops.extrude_face_region(bm, geom=[face])
+    bmesh.ops.triangulate(bm, faces=[face])
+    ext = bmesh.ops.extrude_face_region(bm, geom=bm.faces[:])
     moved = [v for v in ext["geom"] if isinstance(v, bmesh.types.BMVert)]
-    bmesh.ops.translate(bm, verts=moved, vec=(0, thickness, 0))
+    bmesh.ops.translate(bm, verts=moved, vec=(0, 0, thickness))
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     me = bpy.data.meshes.new(name)
     bm.to_mesh(me)
     bm.free()
     obj = bpy.data.objects.new(name, me)
-    obj.location = (0, y - thickness / 2, 0)
-    place(obj, coll, mat, smooth=False)
-    mod = obj.modifiers.new("bevel", "BEVEL")
-    mod.width = bevel
-    mod.segments = 3
-    mod.limit_method = "ANGLE"
+    obj.location = (0, 0, y - thickness / 2)
+    place(obj, coll, mat)
+    # 삼각형 기반 평면은 리메시로 고르게 만든 뒤 부드럽게
+    mod(obj, "REMESH", mode="SMOOTH", octree_depth=7, use_smooth_shade=True)
+    if puff:
+        mod(obj, "CAST", cast_type="SPHERE", factor=0.5, use_x=False, use_y=False, use_z=True)
+    mod(obj, "SMOOTH", factor=0.8, iterations=6)
     return obj
 
 
 def build_samanco(coll):
-    wafer = material("sm_wafer", "#d98a3d", 0.7)
-    cream = material("sm_cream", "#fff6e0")
-    bean = material("sm_bean", "#7a3326")
-    black = material("sm_eye", "#1a1a1a", 0.2)
-    top = fish_slab("top", coll, wafer, 0.16, -0.24)
-    mid = fish_slab("cream", coll, cream, 0.24, 0.0, sx=0.93, sz=0.9, bevel=0.07)
-    red = fish_slab("bean", coll, bean, 0.12, -0.1, sx=0.6, sz=0.45, bevel=0.03)
+    wafer = Mat("sm_wafer", "#c98640", 0.68, Sheen_Weight=0.25)
+    wafer.color_noise("#b8702c", "#dea050", scale=3.0, detail=2.0)
+    wafer.voronoi_bump(scale=8.0, strength=0.6)
+    cream = Mat("sm_cream", "#f6efe2", 0.45, Subsurface_Weight=0.5, Subsurface_Scale=0.1)
+    cream.noise_bump(scale=14, strength=0.1)
+    bean = Mat("sm_bean", "#5a2419", 0.5)
+    bean.noise_bump(scale=18, strength=0.5)
+    eye_m = Mat("sm_eye", "#5a3014", 0.6)
+
+    top = fish_slab("top", coll, wafer, 0.2, 0.26)
+    mid = fish_slab("cream", coll, cream, 0.28, 0.0, sx=0.94, sz=0.9, puff=False)
+    red = fish_slab("bean", coll, bean, 0.14, 0.12, sx=0.62, sz=0.46)
     red.location.x -= 0.15
-    bottom = fish_slab("bottom", coll, wafer, 0.16, 0.24)
-    eye = add("primitive_uv_sphere_add", coll, black, "eye", segments=16, ring_count=10, radius=0.08, location=(-0.95, -0.34, 0.18))
-    eye.parent = top
-    eye.matrix_parent_inverse = top.matrix_world.inverted()
-    # 비늘 느낌의 작은 돌기
-    for i, (x, z) in enumerate([(-0.25, 0.1), (0.0, 0.18), (0.0, -0.05), (0.25, 0.08)]):
-        s = add("primitive_uv_sphere_add", coll, wafer, f"scale_{i}", segments=16, ring_count=8, radius=1, location=(x, -0.33, z), scale=(0.1, 0.03, 0.1))
-        s.parent = top
-        s.matrix_parent_inverse = top.matrix_world.inverted()
-    explode(top, (0, 0, 1.0))
-    explode(red, (0, 0, 0.5))
+    bottom = fish_slab("bottom", coll, wafer, 0.2, -0.26)
+    eye = prim("primitive_uv_sphere_add", coll, eye_m, "eye", segments=24, ring_count=12, radius=0.075, location=(-0.95, 0.2, 0.42), scale=(1, 1, 0.5))
+    parent_keep(eye, top)
+    # 아가미 곡선
+    bpy.ops.mesh.primitive_torus_add(major_radius=0.32, minor_radius=0.025, major_segments=64, minor_segments=8, location=(-0.62, 0.0, 0.43))
+    gill = place(bpy.context.active_object, coll, wafer)
+    gill.name = "gill"
+    bm = bmesh.new()
+    bm.from_mesh(gill.data)
+    bmesh.ops.delete(bm, geom=[v for v in bm.verts if v.co.x < 0.05], context="VERTS")
+    bm.to_mesh(gill.data)
+    bm.free()
+    parent_keep(gill, top)
+    explode(top, (0, 1.0, 0))
+    explode(red, (0, 0.5, 0))
     explode(mid, (0, 0, 0))
-    explode(bottom, (0, 0, -0.9))
+    explode(bottom, (0, -0.9, 0))
 
 
 def build_bravo(coll):
-    wafer = material("br_cone", "#e7a95b", 0.7)
-    blue = material("br_sleeve", "#3d63dd", 0.4)
-    cream = material("br_cream", "#fff6e0", 0.5)
-    choco = material("br_choco", "#6b3a1e", 0.35)
-    sprinkle_mats = [material(f"br_sp{i}", c) for i, c in enumerate(["#e8542f", "#ffd43b", "#7ed957"])]
+    cone_m = Mat("br_cone", "#d99a4e", 0.7)
+    cone_m.waffle(scale=9.0, strength=0.7)
+    sleeve_m = Mat("br_sleeve", "#1f4fd8", 0.6)
+    sleeve_m.noise_bump(scale=30, strength=0.05)
+    cream_m = Mat("br_cream", "#f8f2e6", 0.42, Subsurface_Weight=0.55, Subsurface_Scale=0.12)
+    cream_m.noise_bump(scale=10, strength=0.08)
+    choco_m = Mat("br_choco", "#4a2412", 0.16, Coat_Weight=0.5, Coat_Roughness=0.05)
+    nut_m = Mat("br_nut", "#c7894a", 0.6)
+    nut_m.color_noise("#a86a32", "#dca56a", scale=12)
 
-    cone = add("primitive_cone_add", coll, wafer, "cone", vertices=64, radius1=0.0, radius2=0.75, depth=2.2, location=(0, 0, -0.5), end_fill_type="NOTHING")
-    # 와플 격자 느낌의 링
-    for i in range(4):
-        z = -1.2 + i * 0.35
-        r = 0.75 * (z + 1.6) / 2.2
-        ring = add("primitive_torus_add", coll, wafer, f"cone_ring_{i}", major_radius=r + 0.01, minor_radius=0.018, major_segments=64, minor_segments=8, location=(0, 0, z))
-        ring.parent = cone
-        ring.matrix_parent_inverse = cone.matrix_world.inverted()
-    sleeve = add("primitive_cone_add", coll, blue, "sleeve", vertices=64, radius1=0.53, radius2=0.8, depth=0.8, location=(0, 0, -0.05), end_fill_type="NOTHING")
+    cone = lathe("cone", [(0.02, -1.62), (0.2, -1.2), (0.45, -0.55), (0.66, 0.05), (0.72, 0.45), (0.76, 0.5)], coll, cone_m, smooth_n=4)
+    mod(cone, "SOLIDIFY", thickness=0.035)
+    subsurf(cone, 1)
+    sleeve = lathe("sleeve", [(0.42, -0.62), (0.7, 0.18), (0.72, 0.3)], coll, sleeve_m, smooth_n=0)
+    sleeve.scale = (1.035, 1.035, 1.0)
+    mod(sleeve, "SOLIDIFY", thickness=0.012)
+    subsurf(sleeve, 1)
 
-    swirl_parts = []
-    for i in range(4):
-        t = add("primitive_torus_add", coll, cream, f"swirl_{i}", major_radius=0.72 - i * 0.16, minor_radius=0.2, major_segments=64, minor_segments=16, location=(0, 0, 0.72 + i * 0.22))
-        swirl_parts.append(t)
-    tip = add("primitive_cone_add", coll, cream, "swirl_tip", vertices=32, radius1=0.18, radius2=0.0, depth=0.3, location=(0, 0, 1.62))
-    swirl_parts.append(tip)
+    # 소프트아이스크림: 위로 갈수록 좁아지는 나선 튜브
+    curve = bpy.data.curves.new("swirl", "CURVE")
+    curve.dimensions = "3D"
+    curve.bevel_depth = 0.21
+    curve.bevel_resolution = 8
+    curve.use_fill_caps = True
+    spline = curve.splines.new("POLY")
+    n = 220
+    turns = 3.3
+    spline.points.add(n - 1)
+    for i, p in enumerate(spline.points):
+        t = i / (n - 1)
+        a = t * turns * math.tau
+        r = 0.56 * (1 - t) ** 0.9 + 0.02
+        p.co = (r * math.cos(a), r * math.sin(a), 0.55 + t * 0.95, 1)
+        p.radius = 1.0 - 0.72 * t
+    swirl_obj = bpy.data.objects.new("swirl_tmp", curve)
+    coll.objects.link(swirl_obj)
     bpy.ops.object.select_all(action="DESELECT")
-    for p in swirl_parts:
-        p.select_set(True)
-    bpy.context.view_layer.objects.active = swirl_parts[0]
-    bpy.ops.object.join()
+    swirl_obj.select_set(True)
+    bpy.context.view_layer.objects.active = swirl_obj
+    bpy.ops.object.convert(target="MESH")
     swirl = bpy.context.active_object
-    swirl.name = "cream"
+    base = prim("primitive_uv_sphere_add", coll, cream_m, "swirl_base", segments=64, ring_count=32, radius=0.66, location=(0, 0, 0.55), scale=(1, 1, 0.55))
+    cream = join([swirl, base], "cream")
+    place(cream, coll, cream_m)
+    subsurf(cream, 1)
 
-    # 초콜릿 코팅: 구의 윗부분만 남김
-    bpy.ops.mesh.primitive_uv_sphere_add(segments=64, ring_count=32, radius=0.8, location=(0, 0, 0.62))
-    top = bpy.context.active_object
-    top.name = "choco"
+    # 초콜릿 코팅: 구의 윗부분 + 흘러내린 가장자리
+    bpy.ops.mesh.primitive_uv_sphere_add(segments=96, ring_count=48, radius=0.74, location=(0, 0, 0.72))
+    choco = bpy.context.active_object
+    choco.name = "choco"
     bm = bmesh.new()
-    bm.from_mesh(top.data)
-    bmesh.ops.delete(bm, geom=[v for v in bm.verts if v.co.z < 0.3], context="VERTS")
-    bm.to_mesh(top.data)
+    bm.from_mesh(choco.data)
+    drip = lambda v: 0.1 * math.sin(math.atan2(v.co.y, v.co.x) * 7) + 0.06 * math.sin(math.atan2(v.co.y, v.co.x) * 13)
+    bmesh.ops.delete(bm, geom=[v for v in bm.verts if v.co.z < 0.05 + drip(v)], context="VERTS")
+    bm.to_mesh(choco.data)
     bm.free()
-    place(top, coll, choco)
-    for i in range(14):
-        a = i * 2.4
-        rr = 0.25 + (i % 4) * 0.12
-        z = 0.62 + math.sqrt(max(0.0, 0.8 ** 2 - rr ** 2)) + 0.01
-        sp = add("primitive_cylinder_add", coll, sprinkle_mats[i % 3], f"sprinkle_{i}", vertices=8, radius=0.025, depth=0.12, location=(math.cos(a) * rr, math.sin(a) * rr, z), rotation=(math.radians(90), 0, a))
-        sp.parent = top
-        sp.matrix_parent_inverse = top.matrix_world.inverted()
+    place(choco, coll, choco_m)
+    choco.scale = (1.06, 1.06, 1.08)
+    mod(choco, "SOLIDIFY", thickness=0.03)
+    mod(choco, "DISPLACE", texture=cloud_texture("choco_clouds", 0.3), strength=0.04)
+    subsurf(choco, 1)
+    for i in range(38):
+        a = random.uniform(0, math.tau)
+        rr = random.uniform(0.0, 0.62)
+        z = 0.72 + math.sqrt(max(0.0, 0.8 ** 2 - rr ** 2)) * 1.08
+        nut = prim("primitive_ico_sphere_add", coll, nut_m, f"nut_{i}", subdivisions=1, radius=random.uniform(0.035, 0.06), location=(math.cos(a) * rr, math.sin(a) * rr, z))
+        nut.rotation_euler = (random.random() * 3, random.random() * 3, random.random() * 3)
+        nut.scale = (1, random.uniform(0.6, 1), random.uniform(0.5, 0.9))
+        parent_keep(nut, choco)
 
     explode(cone, (0, 0, 0))
-    explode(sleeve, (0.9, -0.1, 0))
-    explode(swirl, (0, 1.0, 0))
-    explode(top, (0, 1.5, 0))
+    explode(sleeve, (0.95, -0.15, 0))
+    explode(cream, (0, 1.0, 0))
+    explode(choco, (0, 1.7, 0))
 
 
 PRODUCTS_DEF = [
@@ -295,130 +501,245 @@ PRODUCTS_DEF = [
 
 
 # ---------------------------------------------------------------------------
-# scene / render setup
+# scene / render
 # ---------------------------------------------------------------------------
 
 def reset_scene():
     bpy.ops.object.select_all(action="SELECT")
     bpy.ops.object.delete()
-    for block in (bpy.data.meshes, bpy.data.materials, bpy.data.cameras, bpy.data.lights):
+    for block in (bpy.data.meshes, bpy.data.materials, bpy.data.cameras, bpy.data.lights, bpy.data.curves, bpy.data.textures):
         for b in list(block):
             block.remove(b)
 
 
 def setup_render():
     scene = bpy.context.scene
-    scene.render.engine = "BLENDER_EEVEE"
+    scene.render.engine = "CYCLES"
     try:
-        scene.eevee.taa_render_samples = 48
-    except Exception:
-        pass
+        prefs = bpy.context.preferences.addons["cycles"].preferences
+        prefs.compute_device_type = "METAL"
+        prefs.get_devices()
+        for d in prefs.devices:
+            d.use = True
+        scene.cycles.device = "GPU"
+    except Exception as e:
+        print("GPU unavailable, using CPU:", e)
+    scene.cycles.samples = SAMPLES
+    scene.cycles.use_denoising = True
     scene.render.resolution_x = 1000
     scene.render.resolution_y = 1200
     scene.render.film_transparent = True
     scene.render.image_settings.file_format = "PNG"
     scene.render.image_settings.color_mode = "RGBA"
-    scene.view_settings.view_transform = "Standard"
+    # 제품 색이 바래지 않도록 Khronos PBR Neutral (없으면 Standard)
+    for vt in ("Khronos PBR Neutral", "Standard"):
+        try:
+            scene.view_settings.view_transform = vt
+            break
+        except TypeError:
+            continue
 
-    world = bpy.data.worlds.new("world") if not scene.world else scene.world
+    # 내장 스튜디오 HDRI로 반사/환경광
+    world = bpy.data.worlds.new("world")
     scene.world = world
     try:
         world.use_nodes = True
     except Exception:
         pass
-    bg = world.node_tree.nodes.get("Background")
-    if bg:
-        bg.inputs["Color"].default_value = (1, 1, 1, 1)
-        bg.inputs["Strength"].default_value = 0.9
+    nt = world.node_tree
+    env = nt.nodes.new("ShaderNodeTexEnvironment")
+    hdri_dir = bpy.utils.system_resource("DATAFILES", path="studiolights/world")
+    env.image = bpy.data.images.load(os.path.join(hdri_dir, "studio.exr"))
+    bg = nt.nodes["Background"]
+    bg.inputs["Strength"].default_value = 0.8
+    nt.links.new(env.outputs["Color"], bg.inputs["Color"])
 
-    # 외곽선 (Freestyle)
-    scene.render.use_freestyle = True
-    scene.render.line_thickness_mode = "ABSOLUTE"
-    scene.render.line_thickness = 1.0
-    fs = bpy.context.view_layer.freestyle_settings
-    ls = fs.linesets[0] if len(fs.linesets) else fs.linesets.new("outline")
-    for attr in ("select_silhouette", "select_border", "select_external_contour"):
-        if hasattr(ls, attr):
-            setattr(ls, attr, True)
-    for attr in ("select_crease",):
-        if hasattr(ls, attr):
-            setattr(ls, attr, False)
-    ls.linestyle.color = (0.01, 0.01, 0.01)
-    ls.linestyle.thickness = 6.0
+    def area(name, loc, energy, size, color=(1, 1, 1), shadow=True):
+        light = bpy.data.lights.new(name, "AREA")
+        light.energy = energy
+        light.size = size
+        light.color = color
+        light.use_shadow = shadow
+        obj = bpy.data.objects.new(name, light)
+        obj.location = loc
+        direction = -Vector(loc).normalized()
+        obj.rotation_euler = direction.to_track_quat("-Z", "Y").to_euler()
+        scene.collection.objects.link(obj)
 
-    sun = bpy.data.lights.new("sun", "SUN")
-    sun.energy = 3.2
-    sun_obj = bpy.data.objects.new("sun", sun)
-    sun_obj.rotation_euler = (math.radians(45), math.radians(-15), math.radians(-35))
-    scene.collection.objects.link(sun_obj)
+    area("key", (-2.2, -3.2, 7.0), 1100, 6.0)
+    area("fill", (4.5, -3.5, 3.5), 320, 5.0, (1.0, 0.96, 0.9), shadow=False)
+    area("rim", (0.6, 3.0, 6.5), 650, 3.0, shadow=False)
+
+    # 접지 그림자만 남기는 바닥
+    bpy.ops.mesh.primitive_plane_add(size=30, location=(0, 0, 0))
+    floor = bpy.context.active_object
+    floor.name = "shadow_catcher"
+    floor.is_shadow_catcher = True
+    # 렌더 PNG는 제품만 깔끔하게 오려낸다 (그림자는 사이트 CSS에서). 필요하면 True로.
+    floor.hide_render = os.environ.get("FLOOR_SHADOW") != "1"
 
     cam = bpy.data.cameras.new("cam")
-    cam.type = "ORTHO"
+    cam.lens = 70
     cam_obj = bpy.data.objects.new("cam", cam)
     scene.collection.objects.link(cam_obj)
     scene.camera = cam_obj
-    return cam_obj
+    return cam_obj, floor
 
 
-def frame_camera(cam_obj, objs):
+def mesh_objects(coll):
+    return [o for o in coll.all_objects if o.type == "MESH"]
+
+
+def world_bbox(objs):
+    dg = bpy.context.evaluated_depsgraph_get()
     pts = []
     for o in objs:
-        if o.type == "MESH":
-            pts += [o.matrix_world @ Vector(c) for c in o.bound_box]
+        ev = o.evaluated_get(dg)
+        pts += [ev.matrix_world @ Vector(c) for c in ev.bound_box]
     lo = Vector((min(p.x for p in pts), min(p.y for p in pts), min(p.z for p in pts)))
     hi = Vector((max(p.x for p in pts), max(p.y for p in pts), max(p.z for p in pts)))
+    return lo, hi
+
+
+CAM_DIR = {"samanco": (0.3, -1.0, 1.25)}
+
+
+def frame(cam_obj, floor, objs, slug=""):
+    lo, hi = world_bbox(objs)
     center = (lo + hi) / 2
     size = hi - lo
-    direction = Vector((0.45, -1.0, 0.42)).normalized()
-    cam_obj.location = center + direction * 12
+    floor.location.z = lo.z
+    direction = Vector(CAM_DIR.get(slug, (0.38, -1.0, 0.42))).normalized()
+    fov_v = 2 * math.atan(cam_obj.data.sensor_width / 2 / cam_obj.data.lens) * (1200 / 1000)
+    radius = max(size.x, size.y, size.z) * 0.62
+    dist = radius / math.tan(min(fov_v, 2 * math.atan(cam_obj.data.sensor_width / 2 / cam_obj.data.lens)) / 2) * 1.15
+    cam_obj.location = center + direction * dist
     cam_obj.rotation_euler = (-direction).to_track_quat("-Z", "Y").to_euler()
-    height = size.z
-    width = max(size.x, size.y)
-    cam_obj.data.ortho_scale = max(height * 1.18, width * 1.18 * 1.2)
+
+
+# ---------------------------------------------------------------------------
+# baking for glTF (절차적 재질 → 이미지 텍스처)
+# ---------------------------------------------------------------------------
+
+def bake_object(obj, size):
+    mat = obj.active_material
+    scene = bpy.context.scene
+    bpy.ops.object.select_all(action="DESELECT")
+    obj.select_set(True)
+    bpy.context.view_layer.objects.active = obj
+    bpy.ops.object.mode_set(mode="EDIT")
+    bpy.ops.mesh.select_all(action="SELECT")
+    bpy.ops.uv.smart_project(angle_limit=math.radians(66), island_margin=0.01)
+    bpy.ops.object.mode_set(mode="OBJECT")
+
+    nt = mat.node_tree
+    bsdf = nt.nodes["Principled BSDF"]
+    images = {}
+    for kind, colorspace in (("DIFFUSE", "sRGB"), ("NORMAL", "Non-Color"), ("ROUGHNESS", "Non-Color")):
+        img = bpy.data.images.new(f"{obj.name}_{kind.lower()}", size, size, alpha=False)
+        img.colorspace_settings.name = colorspace
+        node = nt.nodes.new("ShaderNodeTexImage")
+        node.image = img
+        nt.nodes.active = node
+        kw = {"type": kind, "margin": 8, "use_clear": True}
+        if kind == "DIFFUSE":
+            kw["pass_filter"] = {"COLOR"}
+        bpy.ops.object.bake(**kw)
+        images[kind] = (img, node)
+
+    # 절차적 노드를 떼고 베이크 이미지로 연결 (glTF가 읽을 수 있는 형태)
+    for link in list(bsdf.inputs["Base Color"].links) + list(bsdf.inputs["Normal"].links) + list(bsdf.inputs["Roughness"].links):
+        nt.links.remove(link)
+    nt.links.new(images["DIFFUSE"][1].outputs["Color"], bsdf.inputs["Base Color"])
+    nt.links.new(images["ROUGHNESS"][1].outputs["Color"], bsdf.inputs["Roughness"])
+    nmap = nt.nodes.new("ShaderNodeNormalMap")
+    nt.links.new(images["NORMAL"][1].outputs["Color"], nmap.inputs["Color"])
+    nt.links.new(nmap.outputs["Normal"], bsdf.inputs["Normal"])
+
+
+def prepare_glb(coll):
+    scene = bpy.context.scene
+    scene.cycles.samples = 8
+    for obj in mesh_objects(coll):
+        bpy.ops.object.select_all(action="DESELECT")
+        obj.select_set(True)
+        bpy.context.view_layer.objects.active = obj
+        if obj.modifiers:
+            bpy.ops.object.convert(target="MESH")
+    for obj in mesh_objects(coll):
+        mat = obj.active_material
+        if mat is None or not mat.get("bake"):
+            continue
+        # 오브젝트마다 재질을 따로 두어야 각자의 UV에 맞는 텍스처가 구워진다
+        own = mat.copy()
+        obj.active_material = own
+        if max(obj.dimensions) > 0.5:
+            bake_object(obj, 1024)
+        else:
+            # 작은 파트(견과·눈 등)는 텍스처 없이 기본 색만
+            bsdf = own.node_tree.nodes["Principled BSDF"]
+            for name in ("Base Color", "Normal", "Roughness"):
+                for link in list(bsdf.inputs[name].links):
+                    own.node_tree.links.remove(link)
+    scene.cycles.samples = SAMPLES
+
+
+def export_glb(coll, slug):
+    bpy.ops.object.select_all(action="DESELECT")
+    for o in mesh_objects(coll):
+        o.select_set(True)
+    kw = dict(
+        filepath=os.path.join(MODELS, f"{slug}.glb"),
+        export_format="GLB",
+        use_selection=True,
+        export_extras=True,
+        export_apply=True,
+        export_yup=True,
+        export_image_format="JPEG",
+    )
+    try:
+        bpy.ops.export_scene.gltf(**kw, export_jpeg_quality=82)
+    except TypeError:
+        bpy.ops.export_scene.gltf(**kw)
 
 
 def main():
     reset_scene()
-    cam = setup_render()
+    cam, floor = setup_render()
     colls = {}
+    targets = [p for p in PRODUCTS_DEF if not ONLY or p[0] == ONLY]
+    for slug, build in targets:
+        colls[slug] = new_collection(slug)
+        build(colls[slug])
 
-    for slug, build in PRODUCTS_DEF:
-        coll = new_collection(slug)
-        colls[slug] = coll
-        build(coll)
-
-    for slug, _ in PRODUCTS_DEF:
-        coll = colls[slug]
-        objs = list(coll.all_objects)
-        for other_slug, other in colls.items():
-            other.hide_render = other_slug != slug
-
-        # GLB (최상위 오브젝트만 선택 → 자식은 함께 포함)
-        bpy.ops.object.select_all(action="DESELECT")
-        for o in objs:
-            o.select_set(True)
-        bpy.ops.export_scene.gltf(
-            filepath=os.path.join(MODELS, f"{slug}.glb"),
-            export_format="GLB",
-            use_selection=True,
-            export_extras=True,
-            export_apply=True,
-            export_yup=True,
-        )
-
-        # PNG 렌더
-        frame_camera(cam, objs)
+    # 1) 실사 렌더
+    for slug, _ in targets:
+        for other, c in colls.items():
+            c.hide_render = other != slug
+        frame(cam, floor, mesh_objects(colls[slug]), slug)
         bpy.context.scene.render.filepath = os.path.join(PRODUCTS, f"{slug}.png")
         bpy.ops.render.render(write_still=True)
-        print(f"BUILT {slug}")
+        print(f"RENDERED {slug}")
 
-    # 편집용 .blend: 제품을 옆으로 나란히 배치해 저장
-    for i, (slug, _) in enumerate(PRODUCTS_DEF):
-        colls[slug].hide_render = False
-        for o in colls[slug].objects:
-            if o.parent is None:
-                o.location.x += (i - 1.5) * 3.2
-    bpy.ops.wm.save_as_mainfile(filepath=os.path.join(ROOT, "blender", "products.blend"))
+    # 2) 편집용 .blend (절차적 재질 그대로)
+    if not ONLY:
+        for i, (slug, _) in enumerate(targets):
+            colls[slug].hide_render = False
+            for o in colls[slug].objects:
+                if o.parent is None:
+                    o.location.x += (i - 1.5) * 3.2
+        bpy.ops.wm.save_as_mainfile(filepath=os.path.join(ROOT, "blender", "products.blend"))
+        for i, (slug, _) in enumerate(targets):
+            for o in colls[slug].objects:
+                if o.parent is None:
+                    o.location.x -= (i - 1.5) * 3.2
+
+    # 3) GLB: 모디파이어 적용 + 베이킹 + 내보내기
+    if not SKIP_GLB:
+        for slug, _ in targets:
+            prepare_glb(colls[slug])
+            export_glb(colls[slug], slug)
+            print(f"EXPORTED {slug}")
     print("DONE")
 
 

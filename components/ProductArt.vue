@@ -67,6 +67,6 @@ const hasImage = useImageAvailable(() => info.value.image)
 }
 .product-art--img {
   object-fit: contain;
-  filter: drop-shadow(6px 6px 0 #1a1a1a);
+  filter: drop-shadow(0 18px 16px rgba(26, 26, 26, 0.22));
 }
 </style>

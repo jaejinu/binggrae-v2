@@ -2,6 +2,7 @@
 import * as THREE from 'three'
 import gsap from 'gsap'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
 import { products, type ProductKey } from '~/data/content'
 
 // 단순화한 오리지널 3D 형태(로고·실제 패키지 없음). Rotate / Zoom / Explode / Detail 모드 지원.
@@ -171,20 +172,21 @@ function buildBravo(): Built {
 }
 
 // public/models/*.glb 가 있으면 그 모델을 사용 (blender/build_products.py 로 생성).
-// 크기·중심을 맞추고, 재질은 사이트와 같은 셀 셰이딩 + 외곽선으로 바꾼다.
+// 블렌더에서 베이킹한 실사 재질(PBR)을 그대로 쓰고, 크기·중심만 맞춘다.
 // 분해 방향은 Blender 커스텀 속성 "explode"(glTF extras)를 우선 사용한다.
-function fromGLB(root: THREE.Object3D): Built {
-  // 순회 중에 외곽선 메시를 추가하면 그것까지 다시 순회하므로, 메시 목록을 먼저 모은다
-  const meshes: THREE.Mesh[] = []
+// 눕혀서 모델링한 제품은 카메라 쪽으로 기울여 보여준다
+const viewTilt: Partial<Record<ProductKey, number>> = { samanco: 0.95 }
+
+function fromGLB(root: THREE.Object3D, key: ProductKey): Built {
   root.traverse((o) => {
-    if ((o as THREE.Mesh).isMesh) meshes.push(o as THREE.Mesh)
-  })
-  meshes.forEach((m) => {
-    const src = m.material as THREE.MeshStandardMaterial
-    m.material = toon('#ffffff', { side: src.side })
-    ;(m.material as THREE.MeshToonMaterial).color.copy(src.color)
+    const m = o as THREE.Mesh
+    if (!m.isMesh) return
     track(m.geometry)
-    m.add(new THREE.Mesh(m.geometry, outlineMat))
+    const mats = Array.isArray(m.material) ? m.material : [m.material]
+    mats.forEach((mat) => {
+      track(mat)
+      Object.values(mat).forEach((v) => (v as THREE.Texture)?.isTexture && track(v as THREE.Texture))
+    })
   })
   const box = new THREE.Box3().setFromObject(root)
   const size = box.getSize(new THREE.Vector3())
@@ -194,6 +196,7 @@ function fromGLB(root: THREE.Object3D): Built {
   const inner = new THREE.Group()
   inner.add(root)
   inner.scale.setScalar(scale)
+  inner.rotation.x = viewTilt[key] ?? 0
   const group = new THREE.Group()
   group.add(inner)
   const parts: Part[] = root.children.map((child) => {
@@ -222,12 +225,40 @@ onMounted(() => {
   renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75))
   renderer.outputColorSpace = THREE.SRGBColorSpace
+  // 블렌더 렌더(Khronos PBR Neutral)와 같은 톤으로
+  renderer.toneMapping = THREE.NeutralToneMapping
   el.appendChild(renderer.domElement)
 
-  scene.add(new THREE.AmbientLight('#ffffff', 1.1))
-  const key = new THREE.DirectionalLight('#ffffff', 2.2)
-  key.position.set(3, 5, 6)
+  // 스튜디오 같은 환경 반사
+  const pmrem = track(new THREE.PMREMGenerator(renderer))
+  scene.environment = track(pmrem.fromScene(new RoomEnvironment(), 0.04).texture)
+
+  scene.add(new THREE.AmbientLight('#ffffff', 0.35))
+  const key = new THREE.DirectionalLight('#ffffff', 1.6)
+  key.position.set(-3, 6, 5)
   scene.add(key)
+  const rim = new THREE.DirectionalLight('#ffffff', 0.8)
+  rim.position.set(2, 3, -5)
+  scene.add(rim)
+
+  // 제품 아래 부드러운 접지 그림자
+  const shadowCanvas = document.createElement('canvas')
+  shadowCanvas.width = shadowCanvas.height = 128
+  const sg = shadowCanvas.getContext('2d')!
+  const grad = sg.createRadialGradient(64, 64, 0, 64, 64, 64)
+  grad.addColorStop(0, 'rgba(0,0,0,0.55)')
+  grad.addColorStop(0.5, 'rgba(0,0,0,0.2)')
+  grad.addColorStop(1, 'rgba(0,0,0,0)')
+  sg.fillStyle = grad
+  sg.fillRect(0, 0, 128, 128)
+  const shadowTex = track(new THREE.CanvasTexture(shadowCanvas))
+  const shadow = new THREE.Mesh(
+    track(new THREE.PlaneGeometry(3.2, 3.2)),
+    track(new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false })),
+  )
+  shadow.rotation.x = -Math.PI / 2
+  shadow.position.y = -1.55
+  scene.add(shadow)
 
   const pivot = new THREE.Group()
   scene.add(pivot)
@@ -243,25 +274,31 @@ onMounted(() => {
   }
   ;(Object.keys(builders) as ProductKey[]).forEach((k) => register(k, builders[k]()))
 
-  const loader = new GLTFLoader()
-  products.forEach((p) => {
-    loader.load(
-      p.model,
-      (gltf) => {
-        const old = built[p.key]
-        pivot.remove(old.group)
-        register(p.key, fromGLB(gltf.scene))
-        if (current === p.key) {
-          current = null
-          showProduct(p.key)
-        }
-      },
-      undefined,
-      () => {
-        /* 모델 파일이 없으면 기본 3D 유지 */
-      },
-    )
-  })
+  // GLB(총 수 MB)는 섹션이 처음 화면에 들어올 때 내려받는다
+  let modelsRequested = false
+  const loadModels = () => {
+    if (modelsRequested) return
+    modelsRequested = true
+    const loader = new GLTFLoader()
+    products.forEach((p) => {
+      loader.load(
+        p.model,
+        (gltf) => {
+          const old = built[p.key]
+          pivot.remove(old.group)
+          register(p.key, fromGLB(gltf.scene, p.key))
+          if (current === p.key) {
+            current = null
+            showProduct(p.key)
+          }
+        },
+        undefined,
+        () => {
+          /* 모델 파일이 없으면 기본 3D 유지 */
+        },
+      )
+    })
+  }
 
   let current: ProductKey | null = null
   function showProduct(k: ProductKey) {
@@ -345,6 +382,7 @@ onMounted(() => {
   io = new IntersectionObserver(([entry]) => {
     const was = visible
     visible = entry.isIntersecting
+    if (visible) loadModels()
     if (visible && !was) kick()
   })
   io.observe(el)
