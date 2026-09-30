@@ -3,6 +3,8 @@ import * as THREE from 'three'
 import gsap from 'gsap'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
+import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js'
+import { EXRLoader } from 'three/examples/jsm/loaders/EXRLoader.js'
 import { products, type ProductKey } from '~/data/content'
 
 // 단순화한 오리지널 3D 형태(로고·실제 패키지 없음). Rotate / Zoom / Explode / Detail 모드 지원.
@@ -274,12 +276,47 @@ onMounted(() => {
   }
   ;(Object.keys(builders) as ProductKey[]).forEach((k) => register(k, builders[k]()))
 
-  // GLB(총 수 MB)는 섹션이 처음 화면에 들어올 때 내려받는다
+  // 제품별 조명(HDRI) — 블렌더 렌더와 같은 분위기. 로드 전까지는 스튜디오 환경 유지
+  const envCache = new Map<ProductKey, THREE.Texture>()
+  const envLoading = new Set<ProductKey>()
+  const exr = new EXRLoader()
+  const applyEnv = (k: ProductKey) => {
+    const info = products.find((p) => p.key === k)!
+    const cached = envCache.get(k)
+    if (cached) {
+      scene.environment = cached
+      scene.environmentRotation.set(0, THREE.MathUtils.degToRad(info.envRotation), 0)
+      return
+    }
+    if (envLoading.has(k)) return
+    envLoading.add(k)
+    exr.load(
+      info.env,
+      (tex) => {
+        const pm = track(pmrem.fromEquirectangular(tex).texture)
+        tex.dispose()
+        envCache.set(k, pm)
+        if (current === k) {
+          applyEnv(k)
+          kickLoop?.()
+        }
+      },
+      undefined,
+      () => {
+        /* HDRI가 없으면 기본 스튜디오 환경 */
+      },
+    )
+  }
+
+  // GLB(Draco 압축)는 섹션이 처음 화면에 들어올 때 내려받는다
   let modelsRequested = false
+  const draco = new DRACOLoader().setDecoderPath('/draco/')
+  cleanups.push(() => draco.dispose())
   const loadModels = () => {
     if (modelsRequested) return
     modelsRequested = true
-    const loader = new GLTFLoader()
+    if (current) applyEnv(current)
+    const loader = new GLTFLoader().setDRACOLoader(draco)
     products.forEach((p) => {
       loader.load(
         p.model,
@@ -312,6 +349,7 @@ onMounted(() => {
     gsap.to(g.scale, { x: 1, y: 1, z: 1, duration: 0.7, delay: 0.2, ease: 'back.out(1.8)' })
     gsap.fromTo(pivot.rotation, { y: pivot.rotation.y - Math.PI }, { y: pivot.rotation.y, duration: 0.9, ease: 'power3.out' })
     applyMode(props.mode)
+    if (modelsRequested) applyEnv(k)
     kickLoop?.()
   }
 

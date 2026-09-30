@@ -19,6 +19,8 @@ export interface Product {
   href: string // 팀원 상세페이지 경로
   image: string // public/ 기준 제품 이미지 (없으면 기본 일러스트)
   model: string // public/ 기준 GLB 3D 모델 (없으면 기본 3D)
+  env: string // LOOK CLOSER 3D 조명 (HDRI, 블렌더 렌더와 같은 분위기)
+  envRotation: number // HDRI 회전 (도)
 }
 
 export const brand = {
@@ -70,8 +72,10 @@ export const products: Product[] = [
     answer: '마시는 대신 떠먹는 방식. 한 숟갈씩 천천히 즐기게 되는 형태의 이유를 따라가 봅니다.',
     details: ['컵 모양의 용기', '벗겨내는 뚜껑', '작은 숟가락'],
     href: '/icons/yoplait',
-    image: '/products/yoplait.png',
+    image: '/products/yoplait.webp',
     model: '/models/yoplait.glb',
+    env: '/env/sunrise.exr',
+    envRotation: 40,
   },
   {
     key: 'bananaMilk',
@@ -88,8 +92,10 @@ export const products: Product[] = [
     answer: '둥근 몸통과 좁은 입구. 손에 쥐었을 때 떠오르는 그 형태의 이유를 따라가 봅니다.',
     details: ['둥근 몸통', '좁아지는 목', '은박 뚜껑'],
     href: '/icons/banana-milk',
-    image: '/products/banana-milk.png',
+    image: '/products/banana-milk.webp',
     model: '/models/banana-milk.glb',
+    env: '/env/courtyard.exr',
+    envRotation: 120,
   },
   {
     key: 'bravo',
@@ -106,8 +112,10 @@ export const products: Product[] = [
     answer: '들고 걸으며 먹을 수 있는 형태. 콘과 아이스크림이 한 번에 완성되는 이유를 따라가 봅니다.',
     details: ['바삭한 콘', '감싸는 포장지', '토핑'],
     href: '/icons/bravo',
-    image: '/products/bravo.png',
+    image: '/products/bravo.webp',
     model: '/models/bravo.glb',
+    env: '/env/city.exr',
+    envRotation: 200,
   },
   {
     key: 'samanco',
@@ -124,8 +132,10 @@ export const products: Product[] = [
     answer: '겨울 길거리 간식이 차가운 아이스크림이 되기까지. 그 모양에 담긴 기억을 따라가 봅니다.',
     details: ['붕어 모양 과자', '가운데 아이스크림', '팥 필링'],
     href: '/icons/samanco',
-    image: '/products/samanco.png',
+    image: '/products/samanco.webp',
     model: '/models/samanco.glb',
+    env: '/env/interior.exr',
+    envRotation: 30,
   },
 ]
 

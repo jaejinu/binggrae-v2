@@ -2,7 +2,7 @@
 빙그레할 틈 — 제품 3D 빌드 스크립트 (Blender 5.x, Cycles)
 
 형태·재질만 사실적으로 만든 오리지널 모델(로고·실제 패키지 그래픽 없음)을 생성한다.
-  - public/products/<slug>.png : Cycles 실사 렌더 (투명 배경 + 접지 그림자)
+  - public/products/<slug>.webp : Cycles 실사 렌더 (투명 배경, 제품별 HDRI 조명)
   - public/models/<slug>.glb   : LOOK CLOSER 인터랙티브 3D (절차적 질감을 텍스처로 베이킹, 파트 분리, explode extras)
   - blender/products.blend     : 편집용 원본 (절차적 재질 그대로)
 
@@ -20,7 +20,7 @@ import random
 
 import bmesh
 import bpy
-from mathutils import Vector
+from mathutils import Matrix, Vector
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 MODELS = os.path.join(ROOT, "public", "models")
@@ -250,9 +250,51 @@ def new_collection(name):
 # products (Blender Z-up, 정면 = -Y)
 # ---------------------------------------------------------------------------
 
+def add_droplets(body, coll, count=340):
+    """차가운 단지 표면의 물방울 + 흘러내린 자국. 하나의 메시로 합쳐 몸통에 붙인다."""
+    water = Mat("water", "#ffffff", 0.02, Transmission_Weight=1.0, IOR=1.33, Specular_IOR_Level=0.6)
+    src = bmesh.new()
+    src.from_mesh(body.data)
+    src.faces.ensure_lookup_table()
+    faces = [f for f in src.faces if -1.12 < f.calc_center_median().z < 0.5]
+    weights = [f.calc_area() for f in faces]
+    total = sum(weights)
+    out = bmesh.new()
+    for i in range(count):
+        # 면적 비례로 면을 고르고, 면 안의 임의 지점에 배치
+        r = random.uniform(0, total)
+        acc = 0.0
+        for f, w in zip(faces, weights):
+            acc += w
+            if acc >= r:
+                break
+        vs = [v.co for v in f.verts]
+        a, b = random.random(), random.random()
+        if a + b > 1:
+            a, b = 1 - a, 1 - b
+        p = vs[0] + (vs[1] - vs[0]) * a + (vs[-1] - vs[0]) * b
+        n = f.normal.copy()
+        if n.dot(Vector((p.x, p.y, 0))) < 0:
+            n.negate()
+        drip = i < 14
+        size = random.uniform(0.028, 0.05) if drip else random.choice([random.uniform(0.008, 0.02), random.uniform(0.015, 0.035)])
+        rot = n.to_track_quat("Z", "Y").to_matrix().to_4x4()
+        stretch = random.uniform(2.2, 3.6) if drip else random.uniform(0.85, 1.25)
+        m = Matrix.Translation(p + n * size * 0.1 - Vector((0, 0, size * (stretch - 1) * 0.9 if drip else 0))) @ rot @ Matrix.Diagonal((size, size * stretch, size * 0.42, 1))
+        bmesh.ops.create_uvsphere(out, u_segments=10 if drip else 8, v_segments=6 if drip else 5, radius=1.0, matrix=m)
+    src.free()
+    me = bpy.data.meshes.new("droplets")
+    out.to_mesh(me)
+    out.free()
+    drops = place(bpy.data.objects.new("droplets", me), coll, water)
+    drops.matrix_world = body.matrix_world
+    parent_keep(drops, body)
+    return drops
+
+
 def build_banana_milk(coll):
-    plastic = Mat("bm_plastic", "#ffc81a", 0.24, Subsurface_Weight=0.12, Subsurface_Scale=0.15, Coat_Weight=0.35, Coat_Roughness=0.06)
-    plastic.set("Subsurface Radius", (1.0, 0.6, 0.1))
+    plastic = Mat("bm_plastic", "#ffcc00", 0.26, Subsurface_Weight=0.05, Subsurface_Scale=0.1, Coat_Weight=0.25, Coat_Roughness=0.06)
+    plastic.set("Subsurface Radius", (1.0, 0.9, 0.3))
     plastic.noise_bump(scale=3.0, strength=0.04)
     cap_m = Mat("bm_cap", "#f5f2ea", 0.38, Subsurface_Weight=0.1)
     cap_m.noise_bump(scale=60, strength=0.05)
@@ -265,6 +307,7 @@ def build_banana_milk(coll):
     # 몸통 가운데의 얕은 띠 (패키지 성형선)
     ridge = prim("primitive_torus_add", coll, plastic, "ridge", major_radius=1.035, minor_radius=0.022, major_segments=128, minor_segments=12, location=(0, 0, -0.42))
     parent_keep(ridge, body)
+    add_droplets(body, coll)
     cap = lathe("cap", [(0, 1.24), (0.41, 1.24), (0.46, 1.2), (0.47, 1.0), (0.45, 0.98)], coll, cap_m, smooth_n=4)
     subsurf(cap, 1)
     foil = prim("primitive_cylinder_add", coll, foil_m, "foil", vertices=96, radius=0.45, depth=0.012, location=(0, 0, 1.25))
@@ -383,8 +426,8 @@ def fish_slab(name, coll, mat, thickness, y, sx=1.0, sz=1.0, puff=True):
 
 
 def build_samanco(coll):
-    wafer = Mat("sm_wafer", "#c98640", 0.68, Sheen_Weight=0.25)
-    wafer.color_noise("#b8702c", "#dea050", scale=3.0, detail=2.0)
+    wafer = Mat("sm_wafer", "#c98640", 0.75)
+    wafer.color_noise("#a45a1e", "#cf8a3a", scale=3.0, detail=2.0)
     wafer.voronoi_bump(scale=8.0, strength=0.6)
     cream = Mat("sm_cream", "#f6efe2", 0.45, Subsurface_Weight=0.5, Subsurface_Scale=0.1)
     cream.noise_bump(scale=14, strength=0.1)
@@ -462,21 +505,81 @@ def build_bravo(coll):
     place(cream, coll, cream_m)
     subsurf(cream, 1)
 
-    # 초콜릿 코팅: 구의 윗부분 + 흘러내린 가장자리
-    bpy.ops.mesh.primitive_uv_sphere_add(segments=96, ring_count=48, radius=0.74, location=(0, 0, 0.72))
-    choco = bpy.context.active_object
-    choco.name = "choco"
+    # 초콜릿 코팅: 부드럽게 물결치는 가장자리 + 방울 맺힌 흘러내림 줄기
+    R, CZ, SXY, SZ = 0.74, 0.72, 1.06, 1.08
+    phase = [random.uniform(0, math.tau) for _ in range(3)]
+
+    def edge_z(a):
+        # 코팅 가장자리 높이(구 로컬 좌표). 낮은 주파수만 섞어 자연스럽게
+        return 0.1 + 0.045 * math.sin(3 * a + phase[0]) + 0.03 * math.sin(5 * a + phase[1]) + 0.015 * math.sin(9 * a + phase[2])
+
+    # 가장자리 곡선을 따라 매개변수로 코팅 면을 직접 생성 → 계단 없는 매끈한 물결 가장자리
+    seg, rows = 160, 48
     bm = bmesh.new()
-    bm.from_mesh(choco.data)
-    drip = lambda v: 0.1 * math.sin(math.atan2(v.co.y, v.co.x) * 7) + 0.06 * math.sin(math.atan2(v.co.y, v.co.x) * 13)
-    bmesh.ops.delete(bm, geom=[v for v in bm.verts if v.co.z < 0.05 + drip(v)], context="VERTS")
-    bm.to_mesh(choco.data)
+    pole = bm.verts.new((0, 0, R))
+    ring_prev = None
+    for j in range(1, rows + 1):
+        ring = []
+        for i in range(seg):
+            a = i / seg * math.tau
+            theta = math.acos(max(-1.0, min(1.0, edge_z(a) / R))) * j / rows
+            ring.append(bm.verts.new((R * math.sin(theta) * math.cos(a), R * math.sin(theta) * math.sin(a), R * math.cos(theta))))
+        for i in range(seg):
+            if ring_prev is None:
+                bm.faces.new((pole, ring[i], ring[(i + 1) % seg]))
+            else:
+                bm.faces.new((ring_prev[i], ring[i], ring[(i + 1) % seg], ring_prev[(i + 1) % seg]))
+        ring_prev = ring
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    me = bpy.data.meshes.new("choco")
+    bm.to_mesh(me)
     bm.free()
+    choco = bpy.data.objects.new("choco", me)
+    choco.location = (0, 0, CZ)
     place(choco, coll, choco_m)
-    choco.scale = (1.06, 1.06, 1.08)
-    mod(choco, "SOLIDIFY", thickness=0.03)
-    mod(choco, "DISPLACE", texture=cloud_texture("choco_clouds", 0.3), strength=0.04)
+    choco.scale = (SXY, SXY, SZ)
+    mod(choco, "SOLIDIFY", thickness=0.035, offset=1.0)
+    mod(choco, "DISPLACE", texture=cloud_texture("choco_clouds", 0.45), strength=0.015)
     subsurf(choco, 1)
+
+    def smoothstep(e0, e1, x):
+        t = max(0.0, min(1.0, (x - e0) / (e1 - e0)))
+        return t * t * (3 - 2 * t)
+
+    drips = []
+    for k in range(8):
+        a = k / 8 * math.tau + random.uniform(-0.25, 0.25)
+        z0 = edge_z(a)
+        rxy = math.sqrt(max(0.0, R * R - z0 * z0)) * SXY
+        top = Vector((math.cos(a) * rxy, math.sin(a) * rxy, CZ + z0 * SZ + 0.06))
+        length = random.uniform(0.16, 0.42)
+        width = random.uniform(0.045, 0.065)
+        curve = bpy.data.curves.new(f"drip_{k}", "CURVE")
+        curve.dimensions = "3D"
+        curve.bevel_depth = width
+        curve.bevel_resolution = 6
+        curve.use_fill_caps = True
+        sp = curve.splines.new("POLY")
+        steps = 14
+        sp.points.add(steps - 1)
+        for j, pt in enumerate(sp.points):
+            t = j / (steps - 1)
+            # 아이스크림 표면을 따라 안쪽으로 붙으며 흘러내린다
+            inward = 1.0 - 0.26 * (t ** 0.7)
+            pt.co = (top.x * inward, top.y * inward, top.z - length * t, 1)
+            # 위는 굵게 → 가늘어졌다가 → 끝에서 살짝 맺힘
+            pt.radius = 1.0 - 0.3 * t + 0.45 * smoothstep(0.78, 1.0, t) - 0.35 * smoothstep(0.96, 1.0, t)
+        ob = bpy.data.objects.new(f"drip_{k}", curve)
+        coll.objects.link(ob)
+        bpy.ops.object.select_all(action="DESELECT")
+        ob.select_set(True)
+        bpy.context.view_layer.objects.active = ob
+        bpy.ops.object.convert(target="MESH")
+        drips.append(bpy.context.active_object)
+    for d in drips:
+        place(d, coll, choco_m)
+        subsurf(d, 1)
+        parent_keep(d, choco)
     for i in range(38):
         a = random.uniform(0, math.tau)
         rr = random.uniform(0.0, 0.62)
@@ -529,8 +632,15 @@ def setup_render():
     scene.render.resolution_x = 1000
     scene.render.resolution_y = 1200
     scene.render.film_transparent = True
-    scene.render.image_settings.file_format = "PNG"
+    # 물방울 같은 투명 재질이 투명 배경을 굴절해 검게 찍히지 않도록
+    try:
+        scene.cycles.film_transparent_glass = True
+        scene.cycles.film_transparent_roughness = 0.1
+    except AttributeError:
+        pass
+    scene.render.image_settings.file_format = "WEBP"
     scene.render.image_settings.color_mode = "RGBA"
+    scene.render.image_settings.quality = 90
     # 제품 색이 바래지 않도록 Khronos PBR Neutral (없으면 Standard)
     for vt in ("Khronos PBR Neutral", "Standard"):
         try:
@@ -547,11 +657,17 @@ def setup_render():
     except Exception:
         pass
     nt = world.node_tree
+    coord = nt.nodes.new("ShaderNodeTexCoord")
+    mapping = nt.nodes.new("ShaderNodeMapping")
+    mapping.name = "env_mapping"
     env = nt.nodes.new("ShaderNodeTexEnvironment")
+    env.name = "env"
     hdri_dir = bpy.utils.system_resource("DATAFILES", path="studiolights/world")
     env.image = bpy.data.images.load(os.path.join(hdri_dir, "studio.exr"))
     bg = nt.nodes["Background"]
     bg.inputs["Strength"].default_value = 0.8
+    nt.links.new(coord.outputs["Generated"], mapping.inputs["Vector"])
+    nt.links.new(mapping.outputs["Vector"], env.inputs["Vector"])
     nt.links.new(env.outputs["Color"], bg.inputs["Color"])
 
     def area(name, loc, energy, size, color=(1, 1, 1), shadow=True):
@@ -584,6 +700,35 @@ def setup_render():
     scene.collection.objects.link(cam_obj)
     scene.camera = cam_obj
     return cam_obj, floor
+
+
+# 제품별 분위기 (모먼트 기획과 맞춤). HDRI는 블렌더 내장 CC0(Poly Haven).
+LOOKS = {
+    # 시작하기 힘든 아침 — 일출빛
+    "yoplait": dict(hdri="sunrise.exr", strength=1.0, rot=40, key=(1.0, 0.9, 0.78), key_e=950, fill=(0.85, 0.92, 1.0), fill_e=300, rim_e=700),
+    # 나른한 오후 — 한낮 야외
+    "banana-milk": dict(hdri="courtyard.exr", strength=1.1, rot=120, key=(1.0, 0.97, 0.9), key_e=1150, fill=(0.95, 0.97, 1.0), fill_e=320, rim_e=650),
+    # 기분 전환 — 산뜻한 도시
+    "bravo": dict(hdri="city.exr", strength=1.15, rot=200, key=(0.95, 0.98, 1.0), key_e=1050, fill=(1.0, 0.96, 0.9), fill_e=300, rim_e=750),
+    # 수고한 하루의 끝 — 따뜻한 실내 조명
+    "samanco": dict(hdri="interior.exr", strength=0.9, rot=30, key=(1.0, 0.8, 0.58), key_e=900, fill=(1.0, 0.86, 0.72), fill_e=230, rim_e=520),
+}
+
+
+def apply_look(slug):
+    look = LOOKS.get(slug)
+    if not look:
+        return
+    world = bpy.context.scene.world
+    nt = world.node_tree
+    hdri_dir = bpy.utils.system_resource("DATAFILES", path="studiolights/world")
+    nt.nodes["env"].image = bpy.data.images.load(os.path.join(hdri_dir, look["hdri"]), check_existing=True)
+    nt.nodes["env_mapping"].inputs["Rotation"].default_value = (0, 0, math.radians(look["rot"]))
+    nt.nodes["Background"].inputs["Strength"].default_value = look["strength"]
+    lights = {o.name: o.data for o in bpy.context.scene.objects if o.type == "LIGHT"}
+    lights["key"].color, lights["key"].energy = look["key"], look["key_e"]
+    lights["fill"].color, lights["fill"].energy = look["fill"], look["fill_e"]
+    lights["rim"].energy = look["rim_e"]
 
 
 def mesh_objects(coll):
@@ -698,7 +843,7 @@ def export_glb(coll, slug):
         export_image_format="JPEG",
     )
     try:
-        bpy.ops.export_scene.gltf(**kw, export_jpeg_quality=82)
+        bpy.ops.export_scene.gltf(**kw, export_jpeg_quality=82, export_draco_mesh_compression_enable=True, export_draco_mesh_compression_level=6)
     except TypeError:
         bpy.ops.export_scene.gltf(**kw)
 
@@ -717,7 +862,8 @@ def main():
         for other, c in colls.items():
             c.hide_render = other != slug
         frame(cam, floor, mesh_objects(colls[slug]), slug)
-        bpy.context.scene.render.filepath = os.path.join(PRODUCTS, f"{slug}.png")
+        apply_look(slug)
+        bpy.context.scene.render.filepath = os.path.join(PRODUCTS, f"{slug}.webp")
         bpy.ops.render.render(write_still=True)
         print(f"RENDERED {slug}")
 

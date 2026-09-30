@@ -5,8 +5,9 @@
 
 | 위치 | 파일 | 쓰이는 곳 |
 |---|---|---|
-| `public/products/` | `yoplait.png`, `samanco.png`, `bravo.png`, `banana-milk.png` | 제품 일러스트 전체 (배경 투명 PNG 권장, 세로 5:6 비율) |
-| `public/models/` | `yoplait.glb`, `samanco.glb`, `bravo.glb`, `banana-milk.glb` | LOOK CLOSER 3D (파트가 분리된 모델이면 Explode 가능) |
+| `public/products/` | `yoplait.webp`, `samanco.webp`, `bravo.webp`, `banana-milk.webp` | 제품 이미지 전체 (투명 배경, 세로 5:6). 현재 `blender/build_products.py` 렌더 결과 |
+| `public/models/` | `yoplait.glb`, `samanco.glb`, `bravo.glb`, `banana-milk.glb` | LOOK CLOSER 3D (Draco 압축 지원, 파트가 분리된 모델이면 Explode 가능) |
+| `public/env/` | `sunrise.exr`, `courtyard.exr`, `city.exr`, `interior.exr` | LOOK CLOSER 제품별 조명 (Poly Haven CC0) |
 | `public/images/` | `time-package.jpg`, `time-ad.jpg`, `time-photo.jpg`, `time-now.jpg` | TIME WITH BINGGRAE (4:5) |
 | `public/images/` | `story-design.jpg`, `story-color.jpg`, `story-naming.jpg`, `story-memory.jpg`, `story-culture.jpg` | STORIES 커버 |
 | `public/fonts/` | `Binggrae.(woff2\|otf\|ttf)`, `Binggrae-Bold.*`, `BinggraeSamanco-Bold.*` | 빙그레체(본문 보조) / 빙그레 싸만코체(한글 제목) — 공식 배포 파일을 **수정 없이** 파일명만 맞춰 넣기 |

@@ -68,5 +68,11 @@ const hasImage = useImageAvailable(() => info.value.image)
 .product-art--img {
   object-fit: contain;
   filter: drop-shadow(0 18px 16px rgba(26, 26, 26, 0.22));
+  animation: float 4.2s ease-in-out infinite;
+}
+/* 살짝 떠 있는 느낌 */
+@keyframes float {
+  0%, 100% { transform: translateY(0) rotate(-1deg); }
+  50% { transform: translateY(-6px) rotate(1deg); }
 }
 </style>
