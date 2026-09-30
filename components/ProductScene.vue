@@ -14,6 +14,7 @@ let renderer: THREE.WebGLRenderer | undefined
 let raf = 0
 let ro: ResizeObserver | undefined
 let io: IntersectionObserver | undefined
+let kickLoop: (() => void) | undefined
 const cleanups: (() => void)[] = []
 const disposables: { dispose(): void }[] = []
 const track = <T extends { dispose(): void }>(d: T) => (disposables.push(d), d)
@@ -169,8 +170,22 @@ function buildBravo(): Built {
   }
 }
 
-// public/models/*.glb 가 있으면 그 모델을 사용. 크기·중심을 맞추고, 최상위 자식들을 분해 파트로 사용.
+// public/models/*.glb 가 있으면 그 모델을 사용 (blender/build_products.py 로 생성).
+// 크기·중심을 맞추고, 재질은 사이트와 같은 셀 셰이딩 + 외곽선으로 바꾼다.
+// 분해 방향은 Blender 커스텀 속성 "explode"(glTF extras)를 우선 사용한다.
 function fromGLB(root: THREE.Object3D): Built {
+  // 순회 중에 외곽선 메시를 추가하면 그것까지 다시 순회하므로, 메시 목록을 먼저 모은다
+  const meshes: THREE.Mesh[] = []
+  root.traverse((o) => {
+    if ((o as THREE.Mesh).isMesh) meshes.push(o as THREE.Mesh)
+  })
+  meshes.forEach((m) => {
+    const src = m.material as THREE.MeshStandardMaterial
+    m.material = toon('#ffffff', { side: src.side })
+    ;(m.material as THREE.MeshToonMaterial).color.copy(src.color)
+    track(m.geometry)
+    m.add(new THREE.Mesh(m.geometry, outlineMat))
+  })
   const box = new THREE.Box3().setFromObject(root)
   const size = box.getSize(new THREE.Vector3())
   const center = box.getCenter(new THREE.Vector3())
@@ -181,12 +196,12 @@ function fromGLB(root: THREE.Object3D): Built {
   inner.scale.setScalar(scale)
   const group = new THREE.Group()
   group.add(inner)
-  const children = root.children.length > 1 ? root.children : root.children[0]?.children ?? []
-  const parts: Part[] = children.map((child, i) => {
-    const c = new THREE.Box3().setFromObject(child).getCenter(new THREE.Vector3())
-    const dir = c.sub(center)
-    if (dir.lengthSq() < 1e-6) dir.set(0, 1, 0).applyAxisAngle(new THREE.Vector3(0, 0, 1), i * 0.9)
-    return { obj: child, explode: dir.normalize().multiplyScalar(0.9 / scale) }
+  const parts: Part[] = root.children.map((child) => {
+    const e = child.userData.explode as number[] | undefined
+    if (Array.isArray(e) && e.length === 3) return { obj: child, explode: new THREE.Vector3(e[0], e[1], e[2]) }
+    const dir = new THREE.Box3().setFromObject(child).getCenter(new THREE.Vector3()).sub(center)
+    if (dir.lengthSq() < 1e-4) return { obj: child, explode: new THREE.Vector3() }
+    return { obj: child, explode: dir.normalize().multiplyScalar(0.9) }
   })
   return { group, parts }
 }
@@ -260,6 +275,7 @@ onMounted(() => {
     gsap.to(g.scale, { x: 1, y: 1, z: 1, duration: 0.7, delay: 0.2, ease: 'back.out(1.8)' })
     gsap.fromTo(pivot.rotation, { y: pivot.rotation.y - Math.PI }, { y: pivot.rotation.y, duration: 0.9, ease: 'power3.out' })
     applyMode(props.mode)
+    kickLoop?.()
   }
 
   function applyMode(mode: Mode) {
@@ -270,6 +286,7 @@ onMounted(() => {
       const t = exploded ? o.clone().add(p.explode) : o
       gsap.to(p.obj.position, { x: t.x, y: t.y, z: t.z, duration: 0.8, ease: exploded ? 'back.out(1.6)' : 'power3.inOut' })
     })
+    kickLoop?.()
     const dist = mode === 'zoom' ? 5.4 : mode === 'detail' ? 6.6 : mode === 'explode' ? 11 : 9.5
     gsap.to(camera.position, { z: dist, duration: 0.9, ease: 'power3.inOut' })
   }
@@ -320,13 +337,15 @@ onMounted(() => {
 
   const clock = new THREE.Clock()
   let visible = false
+  const kick = () => {
+    cancelAnimationFrame(raf)
+    tick()
+  }
+  kickLoop = kick
   io = new IntersectionObserver(([entry]) => {
     const was = visible
     visible = entry.isIntersecting
-    if (visible && !was) {
-      cancelAnimationFrame(raf)
-      tick()
-    }
+    if (visible && !was) kick()
   })
   io.observe(el)
 
