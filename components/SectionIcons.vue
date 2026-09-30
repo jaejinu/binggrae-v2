@@ -9,11 +9,25 @@ const track = ref<HTMLElement>()
 const active = ref(0)
 const touchLayout = ref(false)
 let media: gsap.MatchMedia | undefined
+let sceneTween: gsap.core.Tween | undefined
+const { scrollTo } = useSmoothScroll()
+let touchStart: { x: number; y: number } | null = null
+function beginSwipe(event: PointerEvent) {
+  if (event.pointerType !== 'mouse') touchStart = { x: event.clientX, y: event.clientY }
+}
+function endSwipe(event: PointerEvent) {
+  if (!touchStart) return
+  const dx = event.clientX - touchStart.x, dy = event.clientY - touchStart.y
+  touchStart = null
+  if (sceneTween && Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy) * 1.4) select(Math.max(0, Math.min(list.length - 1, active.value + (dx < 0 ? 1 : -1))))
+}
 function onSwipe() {
-  if (!touchLayout.value || !track.value) return
+  if (sceneTween || !touchLayout.value || !track.value) return
   active.value = Math.max(0, Math.min(list.length - 1, Math.round(track.value.scrollLeft / track.value.clientWidth)))
 }
 function select(index: number) {
+  const st = sceneTween?.scrollTrigger
+  if (st) { scrollTo(st.start + (st.end - st.start) * index / (list.length - 1)); return }
   track.value?.scrollTo({ left: index * track.value.clientWidth, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' })
 }
 
@@ -31,7 +45,8 @@ onMounted(() => {
     touchLayout.value = true
     return () => { touchLayout.value = false; if (track.value) track.value.scrollLeft = 0 }
   })
-  media.add('(pointer: fine) and (min-width: 801px) and (min-height: 701px) and (prefers-reduced-motion: no-preference)', () => {
+  media.add('(prefers-reduced-motion: no-preference)', () => {
+    root.value!.classList.add('icons--animated')
     const panels = gsap.utils.toArray<HTMLElement>('.icon-panel')
     const scrollTween = gsap.to(track.value, {
       x: () => -(track.value!.scrollWidth - window.innerWidth),
@@ -42,13 +57,14 @@ onMounted(() => {
         end: () => `+=${track.value!.scrollWidth - window.innerWidth}`,
         pin: true,
         scrub: 0.6,
-        snap: { snapTo: 1 / (panels.length - 1), duration: 0.5, ease: 'power2.inOut' },
+        // No automatic snapping: a finger reversing direction must retain control.
         invalidateOnRefresh: true,
         onUpdate: (self) => {
           active.value = Math.round(self.progress * (panels.length - 1))
         },
       },
     })
+    sceneTween = scrollTween
 
     // 패널별 등장 모션
     panels.forEach((panel) => {
@@ -72,6 +88,7 @@ onMounted(() => {
         },
       )
     })
+    return () => { sceneTween = undefined; root.value?.classList.remove('icons--animated') }
   }, root.value)
 })
 
@@ -86,7 +103,7 @@ onBeforeUnmount(() => media?.revert())
       <span class="kicker">03 — Binggrae Icons</span>
       <span class="icons__count en-display">{{ String(active + 1).padStart(2, '0') }} / {{ String(list.length).padStart(2, '0') }}</span>
     </div>
-    <div ref="track" class="icons__track" @scroll.passive="onSwipe">
+    <div ref="track" class="icons__track" @scroll.passive="onSwipe" @pointerdown.passive="beginSwipe" @pointerup="endSwipe" @pointercancel="touchStart=null">
       <article
         v-for="(p, i) in list"
         :key="p.key"
@@ -110,7 +127,7 @@ onBeforeUnmount(() => media?.revert())
       </article>
     </div>
     <nav class="icons__touch-nav" aria-label="제품 넘기기">
-      <p>옆으로 밀어 다음 제품을 만나보세요 ↔</p>
+      <p>스크롤로 넘기거나, 좌우로 밀어보세요 ↕ ↔</p>
       <div><button v-for="(p,i) in list" :key="p.key" class="btn btn--sm" :aria-pressed="active===i" @click="select(i)">{{ String(i+1).padStart(2,'0') }} {{ p.nameKo }}</button></div>
     </nav>
   </section>
@@ -233,5 +250,32 @@ onBeforeUnmount(() => media?.revert())
   .icons__track { display: block; width: 100%; }
   .icon-panel { min-height: max(700px, 100svh); height: auto; }
   .icons__count { display: none; }
+}
+</style>
+
+<style scoped>
+.icons.icons--animated { height: 100svh; }
+.icons--animated .icons__track { width: max-content; height: 100%; display: flex; overflow: visible; scroll-snap-type: none; touch-action: pan-y; }
+.icons--animated .icon-panel { flex: 0 0 100vw; height: 100%; min-height: 0; }
+@media (pointer: coarse), (max-width: 800px) {
+  .icons--animated .icons__head { top: 70px; z-index: 45; }
+  .icons--animated .icon-panel { grid-template-columns: 1fr; align-content: center; gap: 10px; padding: 100px var(--gutter) 110px; }
+  .icons--animated .icon-panel__art { width: min(40vw, 23svh); }
+  .icons--animated .icon-panel__text { gap: 7px; }
+  .icons--animated .icon-panel__name { font-size: clamp(38px, 12vw, 68px); }
+  .icons--animated .icon-panel__desc { font-size: 14px; }
+  .icons--animated .icon-panel__text .size-md { font-size: 24px; }
+  .icons--animated .icons__touch-nav { position: absolute; bottom: 0; left: 0; right: 0; z-index: 45; padding: 10px var(--gutter) max(12px, env(safe-area-inset-bottom)); }
+  .icons--animated .icons__touch-nav p { font-size: 12px; margin-bottom: 7px; }
+  .icons--animated .icons__touch-nav > div { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
+  .icons--animated .icons__touch-nav button { min-height: 44px; padding: 4px; font-size: 11px; white-space: normal; }
+}
+@media (max-height: 500px) and (orientation: landscape) {
+  .icons--animated .icon-panel { grid-template-columns: 1fr 1fr; padding: 90px var(--gutter) 90px; gap: 12px; }
+  .icons--animated .icon-panel__art { width: min(22vw, 45svh); }
+  .icons--animated .icon-panel__name { font-size: 38px; }
+  .icons--animated .icon-panel__text { gap: 3px; }
+  .icons--animated .icon-panel__desc { font-size: 12px; }
+  .icons--animated .icon-panel__text .btn { padding: 6px 12px; min-height: 36px; }
 }
 </style>

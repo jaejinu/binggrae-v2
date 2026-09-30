@@ -215,5 +215,92 @@
     ],
     "limits": "Native swipe injection verified in Chromium; native taps verified in Chromium and WebKit. Physical Galaxy, iPhone, KakaoTalk and Instagram apps were not available to this agent."
   },
-  "regressionNote": "Broad regression tests above describe the preceding audit build. The touch follow-up supersedes the former static short-viewport Icons/Featured behavior."
+  "regressionNote": "Broad regression tests above describe the preceding audit build. The touch follow-up supersedes the former static short-viewport Icons/Featured behavior.",
+  "mobileScrollRestoration": {
+    "date": "2026-09-30",
+    "changes": [
+      "Enable Icons and Featured GSAP scroll scenes on touch devices",
+      "Fit pinned controls to short portrait and landscape viewports",
+      "Keep manual controls for reduced motion; remove automatic scroll snapping"
+    ],
+    "sceneChecks": [
+      {
+        "engine": "chromium",
+        "w": 390,
+        "h": 664,
+        "scenes": true,
+        "taps": true
+      },
+      {
+        "engine": "chromium",
+        "w": 360,
+        "h": 640,
+        "scenes": true,
+        "taps": true
+      },
+      {
+        "engine": "chromium",
+        "w": 844,
+        "h": 390,
+        "scenes": true,
+        "taps": true
+      },
+      {
+        "engine": "webkit",
+        "w": 390,
+        "h": 664,
+        "scenes": true,
+        "taps": true
+      },
+      {
+        "engine": "webkit",
+        "w": 360,
+        "h": 640,
+        "scenes": true,
+        "taps": true
+      },
+      {
+        "engine": "webkit",
+        "w": 844,
+        "h": 390,
+        "scenes": true,
+        "taps": true
+      }
+    ],
+    "touchRegression": [
+      {
+        "engine": "chromium",
+        "nativeTaps": true,
+        "nativeSwipes": true,
+        "menuAndForm": true,
+        "errors": []
+      },
+      {
+        "engine": "webkit",
+        "nativeTaps": true,
+        "nativeSwipes": false,
+        "menuAndForm": true,
+        "errors": []
+      }
+    ],
+    "resizeChecks": [
+      {
+        "engine": "chromium",
+        "resize": true,
+        "orientation": true,
+        "reducedMotion": true
+      }
+    ],
+    "renderCheck": "Yoplait quick action changes canvas pixels and rendering settles after interaction",
+    "validation": [
+      "nuxt typecheck",
+      "git diff --check"
+    ],
+    "limitations": [
+      "Emulated mobile Chrome and WebKit, not physical devices",
+      "Native swipe injection tested in Chromium; WebKit uses native taps and programmatic scroll",
+      "KakaoTalk and Instagram in-app browsers not directly tested"
+    ],
+    "supersedes": "Earlier static mobile Icons / Featured fallback expectations"
+  }
 }

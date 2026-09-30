@@ -18,12 +18,13 @@ function selectChapter(index: number) {
 
 onMounted(() => {
   media = gsap.matchMedia()
-  media.add('(pointer: fine) and (min-width: 1001px) and (min-height: 701px) and (prefers-reduced-motion: no-preference)', () => {
+  media.add('(prefers-reduced-motion: no-preference)', () => {
+    pin.value!.classList.add('featured--animated')
     timeline = gsap.timeline({
       scrollTrigger: {
         trigger: pin.value,
         start: 'top top',
-        end: () => `+=${window.innerHeight * 3}`,
+        end: () => `+=${pin.value!.clientHeight * 3}`,
         pin: true,
         scrub: 0.6,
         onUpdate: (self) => {
@@ -33,7 +34,7 @@ onMounted(() => {
     })
       .fromTo('.featured__jar', { rotate: -12, scale: 0.8 }, { rotate: 12, scale: 1.05, ease: 'none' }, 0)
       .fromTo('.featured__year-fill', { scaleX: 0 }, { scaleX: 1, ease: 'none' }, 0)
-    return () => { timeline = undefined }
+    return () => { timeline = undefined; pin.value?.classList.remove('featured--animated') }
   }, root.value)
 })
 
@@ -67,7 +68,7 @@ onBeforeUnmount(() => media?.revert())
           </button>
         </li>
       </ol>
-      <p class="featured__touch-note body-m" role="status">{{ featured.chapters[active]!.q }}<br><small>챕터를 눌러 단지의 모습을 바꿔보세요.</small></p>
+      <p class="featured__touch-note body-m" role="status">{{ featured.chapters[active]!.q }}<br><small>스크롤하거나 챕터를 눌러보세요.</small></p>
     </div>
   </section>
 </template>
@@ -197,5 +198,29 @@ onBeforeUnmount(() => media?.revert())
   .featured__chapters li.--active { transform: none; }
   .featured__touch-note { display: block; min-height: 64px; }
   .featured__touch-note small { font-size: 12px; opacity: .75; }
+}
+</style>
+
+<style scoped>
+.featured__pin.featured--animated { height: 100svh; min-height: 0; overflow: hidden; }
+@media (pointer: coarse), (max-width: 1000px) {
+  .featured__pin.featured--animated { padding-block: 68px 16px; gap: 8px; }
+  .featured--animated .featured__left { gap: 8px; }
+  .featured--animated .featured__left h2 { font-size: 30px; }
+  .featured--animated .featured__left .kicker { font-size: 11px; }
+  .featured--animated .featured__left .btn { min-height: 40px; padding: 6px 12px; }
+  .featured--animated .featured__years { font-size: 18px; }
+  .featured--animated .featured__jar { height: clamp(100px, 23svh, 180px); }
+  .featured--animated .featured__chapters { position: relative; z-index: 45; }
+  .featured--animated .featured__chapters button { min-height: 58px; padding: 6px; gap: 3px; }
+  .featured--animated .featured__touch-note { min-height: 42px; margin: 0; font-size: 14px; }
+}
+@media (max-height: 500px) and (orientation: landscape) {
+  .featured__pin.featured--animated { grid-template-columns: 1fr .5fr 1.2fr; grid-template-rows: auto auto; padding-block: 68px 12px; gap: 8px 20px; }
+  .featured--animated .featured__left { grid-column: 1; grid-row: 1; }
+  .featured--animated .featured__left h2 { font-size: 28px; }
+  .featured--animated .featured__jar { position: relative; grid-column: 2; grid-row: 1; height: 110px; }
+  .featured--animated .featured__chapters { grid-column: 3; grid-row: 1; }
+  .featured--animated .featured__touch-note { grid-column: 1 / -1; grid-row: 2; }
 }
 </style>
