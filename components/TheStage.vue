@@ -20,19 +20,24 @@ let cleanup: (() => void) | undefined
 let disposed = false
 
 onMounted(async () => {
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+  const status = (value: string) => { if (canvasHost.value) canvasHost.value.dataset.status = value }
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { status('모션 줄이기로 생략'); return }
+  status('초기화 중')
   const mobile = window.matchMedia('(pointer: coarse)').matches || window.innerWidth <= 800
 
   let renderer: THREE.WebGLRenderer
   try {
     renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
   } catch {
+    status('WebGL 생성 실패')
     return // WebGL을 못 쓰면 렌더 이미지 그대로
   }
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, mobile ? 1 : 1.75))
   renderer.outputColorSpace = THREE.SRGBColorSpace
   renderer.toneMapping = THREE.NeutralToneMapping
   canvasHost.value!.appendChild(renderer.domElement)
+  renderer.domElement.addEventListener('webglcontextlost', () => status('WebGL context lost'))
+  renderer.domElement.addEventListener('webglcontextrestored', () => status('WebGL context restored'))
 
   const scene = new THREE.Scene()
   const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 100)
@@ -64,9 +69,11 @@ onMounted(async () => {
 
   // ---- 제품 리그 ------------------------------------------------------------
   const keys = products.map((p) => p.key)
+  status('모델 로딩 중')
   const gltfs = await Promise.all(keys.map((k) => loadProductGLTF(k)))
   if (disposed) return
   if (gltfs.some((g) => !g)) {
+    status('모델 로딩 실패')
     disposeBase()
     cleanup = undefined
     return // 모델이 없으면 렌더 이미지 그대로
@@ -79,6 +86,7 @@ onMounted(async () => {
     rigs.set(k, rig)
   })
   document.documentElement.classList.add('stage-ready')
+  status('준비 완료')
 
   // ---- 브랜드북 챕터 연출용 오브젝트 -------------------------------------------
   const jar = rigs.get('bananaMilk')!
