@@ -83,7 +83,7 @@ onBeforeUnmount(() => ctx?.revert())
         <svg class="icon-panel__shape" viewBox="0 0 200 200" aria-hidden="true">
           <path :d="shapes[p.key]" :fill="p.accent" stroke="#1a1a1a" stroke-width="2" opacity=".9" />
         </svg>
-        <div class="icon-panel__art" data-cursor="ICON">
+        <div class="icon-panel__art" data-cursor="ICON" :data-stage="p.key" data-stage-anim="x">
           <ProductArt :product="p.key" />
         </div>
         <div class="icon-panel__text">

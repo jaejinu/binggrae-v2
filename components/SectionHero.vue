@@ -101,7 +101,7 @@ onBeforeUnmount(() => ctx?.revert())
         <SparkleStar class="hero__spark" :size="40" style="left: -18%; top: 8%" />
         <SparkleStar class="hero__spark" :size="28" style="right: -14%; top: 30%" />
         <SparkleStar class="hero__spark" :size="32" style="left: -8%; bottom: 10%" />
-        <div class="hero__product">
+        <div class="hero__product" data-stage="bananaMilk" data-stage-anim="scale">
           <ProductArt product="bananaMilk" />
         </div>
       </div>

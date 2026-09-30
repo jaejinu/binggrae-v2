@@ -321,6 +321,19 @@ onMounted(() => {
       loader.load(
         p.model,
         (gltf) => {
+          // glTF 기본 자세는 조립 전(첫 프레임)이라 마지막 프레임(완성)으로 맞춘다
+          if (gltf.animations.length) {
+            const mx = new THREE.AnimationMixer(gltf.scene)
+            gltf.animations.forEach((clip) => {
+              const action = mx.clipAction(clip)
+              action.setLoop(THREE.LoopOnce, 1)
+              action.clampWhenFinished = true
+              action.play()
+              action.time = clip.duration * 0.9999
+            })
+            mx.update(0)
+            gltf.scene.updateMatrixWorld(true)
+          }
           const old = built[p.key]
           pivot.remove(old.group)
           register(p.key, fromGLB(gltf.scene, p.key))

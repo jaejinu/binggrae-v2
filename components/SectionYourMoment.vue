@@ -11,6 +11,7 @@ const text = ref('')
 const card = ref<{ reason: number; text: string; product: number; date: string } | null>(null)
 const cardEl = ref<HTMLElement>()
 const saved = ref<typeof card.value[]>([])
+const physics = ref<{ drop: (key?: string) => void }>()
 
 const STORAGE_KEY = 'binggrae-moments'
 
@@ -36,6 +37,7 @@ async function make() {
   } catch {
     /* 저장 불가 환경은 무시 */
   }
+  physics.value?.drop(products[card.value.product].key)
   await nextTick()
   gsap.fromTo(cardEl.value!, { scale: 0.4, rotate: -20, opacity: 0 }, { scale: 1, rotate: -3, opacity: 1, duration: 0.7, ease: 'back.out(2)' })
 }
@@ -144,6 +146,10 @@ function wrap(g: CanvasRenderingContext2D, s: string, x: number, y: number, max:
         <button v-if="card" class="btn" @click="download">이미지로 저장 ↓</button>
       </div>
     </div>
+
+    <ClientOnly>
+      <MomentPhysics ref="physics" />
+    </ClientOnly>
 
     <div v-if="saved.length > 1" class="ym__wall">
       <span class="kicker">최근에 만든 카드</span>

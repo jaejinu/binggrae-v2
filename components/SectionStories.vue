@@ -4,6 +4,30 @@ import { stories } from '~/data/content'
 
 // 06. BINGGRAE STORIES — Magazine / Editorial
 const root = ref<HTMLElement>()
+
+// 커버에 마우스를 올리면 물결처럼 일렁이는 왜곡 (카드마다 별도 SVG 필터)
+function ripple(i: number, on: boolean) {
+  const disp = root.value?.querySelector<SVGFEDisplacementMapElement>(`#story-ripple-${i} feDisplacementMap`)
+  const turb = root.value?.querySelector<SVGFETurbulenceElement>(`#story-ripple-${i} feTurbulence`)
+  const cover = root.value?.querySelectorAll<HTMLElement>('.story__cover')[i]
+  if (!disp || !turb || !cover) return
+  const state = { s: Number(disp.getAttribute('scale')), f: 0.012 }
+  gsap.killTweensOf(state)
+  if (on) cover.style.filter = `url(#story-ripple-${i})`
+  gsap.to(state, {
+    s: on ? 22 : 0,
+    f: on ? 0.02 : 0.012,
+    duration: on ? 0.6 : 0.5,
+    ease: on ? 'elastic.out(1, 0.5)' : 'power2.out',
+    onUpdate: () => {
+      disp.setAttribute('scale', state.s.toFixed(2))
+      turb.setAttribute('baseFrequency', `${state.f.toFixed(4)} ${(state.f * 1.6).toFixed(4)}`)
+    },
+    onComplete: () => {
+      if (!on) cover.style.filter = ''
+    },
+  })
+}
 useSectionColor(root, () => ({ bg: '#fffdf6' }))
 onMounted(() => {
   gsap.from(root.value!.querySelectorAll('.story'), {
@@ -26,7 +50,23 @@ onMounted(() => {
     </div>
 
     <div class="stories__grid">
-      <a v-for="(s, i) in stories" :key="s.tag" href="#" class="story" :class="`--s${i}`" data-cursor="READ" @click.prevent>
+      <svg width="0" height="0" class="stories__defs" aria-hidden="true">
+        <filter v-for="(s, i) in stories" :id="`story-ripple-${i}`" :key="s.tag" x="-5%" y="-5%" width="110%" height="110%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.012 0.02" numOctaves="2" seed="3" result="noise" />
+          <feDisplacementMap in="SourceGraphic" in2="noise" scale="0" xChannelSelector="R" yChannelSelector="G" />
+        </filter>
+      </svg>
+      <a
+        v-for="(s, i) in stories"
+        :key="s.tag"
+        href="#"
+        class="story"
+        :class="`--s${i}`"
+        data-cursor="READ"
+        @click.prevent
+        @mouseenter="ripple(i, true)"
+        @mouseleave="ripple(i, false)"
+      >
         <div class="story__cover" :style="{ background: s.color }">
           <MediaSlot :src="s.image" :alt="s.title"><span /></MediaSlot>
           <span class="story__issue en-display">No.{{ String(i + 1).padStart(2, '0') }}</span>
@@ -57,6 +97,9 @@ onMounted(() => {
 }
 .stories__masthead h2 {
   line-height: 0.8;
+}
+.stories__defs {
+  position: absolute;
 }
 .stories__grid {
   display: grid;

@@ -45,7 +45,7 @@ onBeforeUnmount(() => ctx?.revert())
         <NuxtLink :to="featured.cta.href" class="btn">{{ featured.cta.label }} →</NuxtLink>
       </div>
 
-      <div class="featured__jar" aria-hidden="true">
+      <div class="featured__jar" aria-hidden="true" data-stage="bananaMilk" data-stage-mode="featured" :data-stage-chapter="active">
         <ProductArt product="bananaMilk" />
       </div>
 

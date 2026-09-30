@@ -32,6 +32,10 @@ function onStart() {
 <template>
   <main class="page" :style="{ color: ink }">
     <div class="page__bg" :style="{ background: bg }" aria-hidden="true" />
+    <ClientOnly>
+      <TheLiquidBg />
+      <TheStage />
+    </ClientOnly>
     <ThePreloader v-if="!started" @start="onStart" />
     <TheCursor />
     <TheHeader />
@@ -58,7 +62,7 @@ function onStart() {
 .page__bg {
   position: fixed;
   inset: 0;
-  z-index: -1;
+  z-index: -2;
   transition: background-color 0.7s ease;
 }
 </style>

@@ -595,6 +595,124 @@ def build_bravo(coll):
     explode(choco, (0, 1.7, 0))
 
 
+# ---------------------------------------------------------------------------
+# "완성되는" 애니메이션 (GLB에 포함 → 사이트에서 스크롤로 재생)
+# 마지막 프레임 = 완성 상태(렌더/분해의 기준 자세)
+# ---------------------------------------------------------------------------
+
+END = 64
+
+
+def part(coll, name):
+    for o in coll.objects:
+        if o.name == name or o.name.startswith(name + "."):
+            return o
+    raise KeyError(name)
+
+
+def key(obj, frame, loc=None, rot=None, scale=None):
+    if loc is not None:
+        obj.location = loc
+        obj.keyframe_insert("location", frame=frame)
+    if rot is not None:
+        obj.rotation_euler = rot
+        obj.keyframe_insert("rotation_euler", frame=frame)
+    if scale is not None:
+        obj.scale = scale
+        obj.keyframe_insert("scale", frame=frame)
+
+
+def rest(obj):
+    return obj.location.copy(), obj.rotation_euler.copy(), obj.scale.copy()
+
+
+def off(v, dx=0.0, dy=0.0, dz=0.0):
+    return (v.x + dx, v.y + dy, v.z + dz)
+
+
+def rz(r, dz):
+    return (r.x, r.y, r.z + dz)
+
+
+def anim_banana_milk(coll):
+    body, cap, foil = part(coll, "body"), part(coll, "cap"), part(coll, "foil")
+    bl, br, bs = rest(body)
+    key(body, 1, scale=(0.85, 0.85, 0.7))
+    key(body, 18, scale=(1.05, 1.05, 1.08))
+    key(body, 28, scale=tuple(bs))
+    cl, cr, _ = rest(cap)
+    key(cap, 1, loc=off(cl, dz=1.1), rot=rz(cr, math.pi * 3))
+    key(cap, 30, loc=off(cl, dz=0.25), rot=rz(cr, math.pi))
+    key(cap, 55, loc=tuple(cl), rot=tuple(cr))
+    fl, fr, _ = rest(foil)
+    key(foil, 1, loc=off(fl, dz=1.8), rot=(math.radians(25), 0, 0))
+    key(foil, 40, loc=off(fl, dz=0.5), rot=(math.radians(-10), 0, 0))
+    key(foil, END, loc=tuple(fl), rot=tuple(fr))
+
+
+def anim_yoplait(coll):
+    cup, yog, lid, spoon = part(coll, "cup"), part(coll, "yogurt"), part(coll, "lid"), part(coll, "spoon")
+    _, _, cs = rest(cup)
+    key(cup, 1, scale=(1, 1, 0.6))
+    key(cup, 18, scale=(1.04, 1.04, 1.05))
+    key(cup, 26, scale=tuple(cs))
+    _, _, ys = rest(yog)
+    key(yog, 1, scale=(0.4, 0.4, 0.01))
+    key(yog, 36, scale=tuple(ys))
+    ll, lr, _ = rest(lid)
+    key(lid, 1, loc=off(ll, dx=-1.2, dz=1.4), rot=(lr.x, lr.y + math.radians(60), lr.z))
+    key(lid, 42, loc=tuple(ll), rot=tuple(lr))
+    sl, sr, _ = rest(spoon)
+    key(spoon, 1, loc=off(sl, dz=2.0))
+    key(spoon, 30, loc=off(sl, dz=0.9))
+    key(spoon, END, loc=tuple(sl))
+
+
+def anim_samanco(coll):
+    top, bottom, mid, bean = part(coll, "top"), part(coll, "bottom"), part(coll, "cream"), part(coll, "bean")
+    tl, tr, _ = rest(top)
+    key(top, 1, loc=off(tl, dz=1.4), rot=(math.radians(25), 0, 0))
+    key(top, 40, loc=off(tl, dz=0.25), rot=(0, 0, 0))
+    key(top, END, loc=tuple(tl), rot=tuple(tr))
+    bl, _, _ = rest(bottom)
+    key(bottom, 1, loc=off(bl, dz=-1.0))
+    key(bottom, 30, loc=tuple(bl))
+    _, _, ms = rest(mid)
+    key(mid, 1, scale=(0.2, 0.2, 0.2))
+    key(mid, 35, scale=tuple(ms))
+    _, _, bs = rest(bean)
+    key(bean, 10, scale=(0.0, 0.0, 0.0))
+    key(bean, 40, scale=tuple(bs))
+
+
+def anim_bravo(coll):
+    cone, sleeve, cream, choco = part(coll, "cone"), part(coll, "sleeve"), part(coll, "cream"), part(coll, "choco")
+    _, cr, cs = rest(cone)
+    key(cone, 1, rot=rz(cr, -math.pi / 2), scale=(0.9, 0.9, 0.9))
+    key(cone, 25, rot=tuple(cr), scale=tuple(cs))
+    sl, _, ss = rest(sleeve)
+    key(sleeve, 1, loc=off(sl, dz=-0.6), scale=(ss.x * 0.9, ss.y * 0.9, ss.z))
+    key(sleeve, 25, loc=tuple(sl), scale=tuple(ss))
+    # 아이스크림이 콘 위에서 빙글빙글 짜 올라가도록 원점을 바닥으로
+    bpy.ops.object.select_all(action="DESELECT")
+    cream.select_set(True)
+    bpy.context.view_layer.objects.active = cream
+    bpy.context.scene.cursor.location = (0, 0, 0.5)
+    bpy.ops.object.origin_set(type="ORIGIN_CURSOR")
+    _, rr, rs = rest(cream)
+    key(cream, 8, rot=rz(rr, -math.tau), scale=(0.25, 0.25, 0.02))
+    key(cream, 44, rot=tuple(rr), scale=tuple(rs))
+    hl, _, hs = rest(choco)
+    key(choco, 1, loc=off(hl, dz=1.3), scale=(0, 0, 0))
+    key(choco, 40, loc=off(hl, dz=1.3), scale=(0, 0, 0))
+    key(choco, 42, loc=off(hl, dz=1.2), scale=tuple(hs))
+    key(choco, 56, loc=tuple(hl), scale=(hs.x * 1.04, hs.y * 1.04, hs.z * 0.88))
+    key(choco, END, loc=tuple(hl), scale=tuple(hs))
+
+
+ANIMATE = {"banana-milk": anim_banana_milk, "yoplait": anim_yoplait, "samanco": anim_samanco, "bravo": anim_bravo}
+
+
 PRODUCTS_DEF = [
     ("banana-milk", build_banana_milk),
     ("yoplait", build_yoplait),
@@ -842,10 +960,13 @@ def export_glb(coll, slug):
         export_yup=True,
         export_image_format="JPEG",
     )
+    extra = dict(export_jpeg_quality=82, export_draco_mesh_compression_enable=True, export_draco_mesh_compression_level=6,
+                 export_animations=True, export_animation_mode="SCENE", export_frame_range=True)
     try:
-        bpy.ops.export_scene.gltf(**kw, export_jpeg_quality=82, export_draco_mesh_compression_enable=True, export_draco_mesh_compression_level=6)
+        bpy.ops.export_scene.gltf(**kw, **extra)
     except TypeError:
-        bpy.ops.export_scene.gltf(**kw)
+        extra.pop("export_animation_mode")
+        bpy.ops.export_scene.gltf(**kw, **extra)
 
 
 def main():
@@ -856,6 +977,13 @@ def main():
     for slug, build in targets:
         colls[slug] = new_collection(slug)
         build(colls[slug])
+    scene = bpy.context.scene
+    scene.frame_start, scene.frame_end = 1, END
+    scene.render.fps = 30
+    for slug, _ in targets:
+        ANIMATE[slug](colls[slug])
+    # 완성 상태에서 렌더·내보내기
+    scene.frame_set(END)
 
     # 1) 실사 렌더
     for slug, _ in targets:
@@ -867,18 +995,28 @@ def main():
         bpy.ops.render.render(write_still=True)
         print(f"RENDERED {slug}")
 
-    # 2) 편집용 .blend (절차적 재질 그대로)
+    # 2) 편집용 .blend (절차적 재질 그대로). 애니메이션 키가 있으므로 임시 부모 empty로 나란히 배치
     if not ONLY:
+        empties = []
         for i, (slug, _) in enumerate(targets):
             colls[slug].hide_render = False
-            for o in colls[slug].objects:
-                if o.parent is None:
-                    o.location.x += (i - 1.5) * 3.2
+            e = bpy.data.objects.new(f"{slug}_layout", None)
+            colls[slug].objects.link(e)
+            for o in list(colls[slug].objects):
+                if o.parent is None and o is not e:
+                    o.parent = e
+            e.location.x = (i - 1.5) * 3.2
+            empties.append(e)
         bpy.ops.wm.save_as_mainfile(filepath=os.path.join(ROOT, "blender", "products.blend"))
-        for i, (slug, _) in enumerate(targets):
-            for o in colls[slug].objects:
-                if o.parent is None:
-                    o.location.x -= (i - 1.5) * 3.2
+        for e in empties:
+            e.location.x = 0
+            bpy.context.view_layer.update()
+            for o in list(e.children):
+                mw = o.matrix_world.copy()
+                o.parent = None
+                o.matrix_world = mw
+            bpy.data.objects.remove(e)
+        scene.frame_set(END)
 
     # 3) GLB: 모디파이어 적용 + 베이킹 + 내보내기
     if not SKIP_GLB:

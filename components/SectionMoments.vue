@@ -56,7 +56,7 @@ onMounted(() => {
 
       <div class="moments__panel card">
         <SparkleStar class="moments__spark" :size="36" />
-        <div class="moments__art" :key="current.key">
+        <div class="moments__art" :key="current.key" :data-stage="current.key">
           <ProductArt :product="current.key" />
         </div>
         <div class="moments__detail" :key="`d-${current.key}`">
