@@ -19,7 +19,7 @@ export function loadProductGLTF(key: ProductKey): Promise<GLTF | null> {
 }
 
 /** 눕혀서 모델링한 제품은 카메라 쪽으로 기울여 보여준다 */
-export const VIEW_TILT: Partial<Record<ProductKey, number>> = { samanco: 0.95 }
+export const VIEW_TILT: Partial<Record<ProductKey, number>> = {}
 
 export interface RigPart {
   obj: THREE.Object3D
@@ -48,6 +48,7 @@ export interface ProductRig {
  */
 export function makeRig(gltf: GLTF, key: ProductKey, opts: { tilt?: boolean; cloneMaterials?: boolean; size?: number } = {}): ProductRig {
   const root = gltf.scene.clone(true)
+  finishProduct(root)
   const meshes: THREE.Mesh[] = []
   root.traverse((o) => {
     const m = o as THREE.Mesh
@@ -100,19 +101,13 @@ export function makeRig(gltf: GLTF, key: ProductKey, opts: { tilt?: boolean; clo
   const group = new THREE.Group()
   group.add(spin)
 
-  const parts: RigPart[] = root.children.map((child) => {
-    const e = child.userData.explode as number[] | undefined
-    return {
-      obj: child,
-      rest: child.position.clone(),
-      explode: Array.isArray(e) && e.length === 3 ? new THREE.Vector3(e[0], e[1], e[2]) : new THREE.Vector3(),
-    }
-  })
+  const parts: RigPart[] = productParts(root).map(({ obj, explode }) => ({ obj, explode, rest: obj.position.clone() }))
 
   const pose = (progress: number, explode = 0) => {
     parts.forEach((p) => p.obj.position.copy(p.rest))
     if (mixer) settle(THREE.MathUtils.clamp(progress, 0, 1) * duration)
-    if (explode > 0) parts.forEach((p) => p.obj.position.addScaledVector(p.explode, explode))
+    const spread = mixer ? explode : Math.max(explode, (1 - progress) * 0.7)
+    if (spread > 0) parts.forEach((p) => p.obj.position.addScaledVector(p.explode, spread))
   }
   pose(1)
 
@@ -122,6 +117,12 @@ export function makeRig(gltf: GLTF, key: ProductKey, opts: { tilt?: boolean; clo
 // ---- 제품별 조명(HDRI) --------------------------------------------------------
 
 const envCache = new WeakMap<THREE.WebGLRenderer, Map<ProductKey, Promise<THREE.Texture | null>>>()
+const disposedRenderers = new WeakSet<THREE.WebGLRenderer>()
+export function disposeProductEnvs(renderer: THREE.WebGLRenderer) {
+  disposedRenderers.add(renderer)
+  envCache.get(renderer)?.forEach(p => p.then(tex => tex?.dispose()))
+  envCache.delete(renderer)
+}
 let exrLoader: EXRLoader | null = null
 
 /** 렌더러별로 PMREM 처리한 제품 HDRI를 캐시해서 돌려준다 */
@@ -136,6 +137,7 @@ export function loadProductEnv(renderer: THREE.WebGLRenderer, pmrem: THREE.PMREM
       exrLoader
         .loadAsync(url)
         .then((tex) => {
+          if (disposedRenderers.has(renderer)) { tex.dispose(); return null }
           const pm = pmrem.fromEquirectangular(tex).texture
           tex.dispose()
           return pm
@@ -148,4 +150,17 @@ export function loadProductEnv(renderer: THREE.WebGLRenderer, pmrem: THREE.PMREM
 
 export function envRotation(key: ProductKey) {
   return THREE.MathUtils.degToRad(products.find((p) => p.key === key)!.envRotation)
+}
+
+/** Named movable groups include their labels and decorative children. */
+export function productParts(root: THREE.Object3D) {
+  const offsets: Record<string, [number, number, number]> = {
+    Foil_Lid: [0, .48, 0], Wafer_Front: [0, .48, .4], Ice_Cream: [0, .48, 0],
+  }
+  const parts: { obj: THREE.Object3D; explode: THREE.Vector3 }[] = []
+  root.traverse(obj => {
+    const e = offsets[obj.name] ?? obj.userData.explode
+    if (Array.isArray(e) && e.length === 3) parts.push({ obj, explode: new THREE.Vector3(...e as [number, number, number]) })
+  })
+  return parts
 }

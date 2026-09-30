@@ -7,7 +7,15 @@ const list = iconOrder.map((k) => products.find((p) => p.key === k)!)
 const root = ref<HTMLElement>()
 const track = ref<HTMLElement>()
 const active = ref(0)
-let ctx: gsap.Context | undefined
+const touchLayout = ref(false)
+let media: gsap.MatchMedia | undefined
+function onSwipe() {
+  if (!touchLayout.value || !track.value) return
+  active.value = Math.max(0, Math.min(list.length - 1, Math.round(track.value.scrollLeft / track.value.clientWidth)))
+}
+function select(index: number) {
+  track.value?.scrollTo({ left: index * track.value.clientWidth, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' })
+}
 
 // 제품별 그래픽 도형 (배경 장식)
 const shapes: Record<string, string> = {
@@ -18,7 +26,12 @@ const shapes: Record<string, string> = {
 }
 
 onMounted(() => {
-  ctx = gsap.context(() => {
+  media = gsap.matchMedia()
+  media.add('(pointer: coarse), (max-width: 800px)', () => {
+    touchLayout.value = true
+    return () => { touchLayout.value = false; if (track.value) track.value.scrollLeft = 0 }
+  })
+  media.add('(pointer: fine) and (min-width: 801px) and (min-height: 701px) and (prefers-reduced-motion: no-preference)', () => {
     const panels = gsap.utils.toArray<HTMLElement>('.icon-panel')
     const scrollTween = gsap.to(track.value, {
       x: () => -(track.value!.scrollWidth - window.innerWidth),
@@ -62,9 +75,9 @@ onMounted(() => {
   }, root.value)
 })
 
-useSectionColor(root, () => ({ bg: list[active.value].bg, ink: list[active.value].ink }), () => root.value?.parentElement)
+useSectionColor(root, () => ({ bg: list[active.value].bg, ink: list[active.value].ink }), () => root.value?.parentElement?.classList.contains('pin-spacer') ? root.value.parentElement : root.value)
 
-onBeforeUnmount(() => ctx?.revert())
+onBeforeUnmount(() => media?.revert())
 </script>
 
 <template>
@@ -73,7 +86,7 @@ onBeforeUnmount(() => ctx?.revert())
       <span class="kicker">03 — Binggrae Icons</span>
       <span class="icons__count en-display">{{ String(active + 1).padStart(2, '0') }} / {{ String(list.length).padStart(2, '0') }}</span>
     </div>
-    <div ref="track" class="icons__track">
+    <div ref="track" class="icons__track" @scroll.passive="onSwipe">
       <article
         v-for="(p, i) in list"
         :key="p.key"
@@ -96,6 +109,10 @@ onBeforeUnmount(() => ctx?.revert())
         <span class="icon-panel__no en-display" aria-hidden="true">{{ String(i + 1).padStart(2, '0') }}</span>
       </article>
     </div>
+    <nav class="icons__touch-nav" aria-label="제품 넘기기">
+      <p>옆으로 밀어 다음 제품을 만나보세요 ↔</p>
+      <div><button v-for="(p,i) in list" :key="p.key" class="btn btn--sm" :aria-pressed="active===i" @click="select(i)">{{ String(i+1).padStart(2,'0') }} {{ p.nameKo }}</button></div>
+    </nav>
   </section>
 </template>
 
@@ -119,6 +136,7 @@ onBeforeUnmount(() => ctx?.revert())
 .icons__count {
   font-size: 18px;
 }
+.icons__touch-nav { display: none; }
 .icons__track {
   display: flex;
   height: 100%;
@@ -190,5 +208,30 @@ onBeforeUnmount(() => ctx?.revert())
   .icon-panel__name {
     font-size: clamp(48px, 15vw, 96px);
   }
+}
+</style>
+
+<style scoped>
+@media (pointer: coarse), (max-width: 800px) {
+  .icons { height: auto; }
+  .icons__head { top: 24px; }
+  .icons__count { display: block; }
+  .icons__track { width: 100%; height: auto; display: flex; overflow-x: auto; scroll-snap-type: x mandatory; overscroll-behavior-x: contain; scrollbar-width: none; will-change: auto; }
+  .icons__track::-webkit-scrollbar { display: none; }
+  .icon-panel { flex: 0 0 100%; min-height: 600px; height: auto; padding: 78px var(--gutter) 38px; scroll-snap-align: start; scroll-snap-stop: always; }
+  .icon-panel__art { width: min(46vw, 220px); }
+  .icons__touch-nav { display: block; padding: 16px var(--gutter) 28px; background: var(--cream); color: var(--ink); }
+  .icons__touch-nav p { margin: 0 0 14px; font-size: 14px; }
+  .icons__touch-nav > div { display: flex; flex-wrap: wrap; gap: 10px; }
+}
+</style>
+
+<style scoped>
+@media (pointer: fine) and (min-width: 801px) and (max-height: 700px), (pointer: fine) and (min-width: 801px) and (prefers-reduced-motion: reduce) {
+  .icons { height: auto; }
+  .icons__head { top: 28px; }
+  .icons__track { display: block; width: 100%; }
+  .icon-panel { min-height: max(700px, 100svh); height: auto; }
+  .icons__count { display: none; }
 }
 </style>

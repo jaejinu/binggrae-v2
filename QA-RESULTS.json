@@ -1,0 +1,219 @@
+{
+  "date": "2026-09-30",
+  "url": "https://binggrae-moment.vercel.app",
+  "scope": "Main page, brand book, mobile 3D stability",
+  "environment": {
+    "browsers": [
+      "Chrome (Playwright channel chrome)",
+      "Playwright WebKit (Safari engine, not a physical iPhone)"
+    ],
+    "viewports": [
+      "1440x900",
+      "768x1024",
+      "390x844",
+      "360x640",
+      "844x390"
+    ],
+    "mobileIdle": "390x844, DPR 3, touch/coarse pointer emulation"
+  },
+  "regression": [
+    {
+      "name": "navigation-menu",
+      "status": "pass"
+    },
+    {
+      "name": "rapid-products-card",
+      "status": "pass"
+    },
+    {
+      "name": "layout-360",
+      "status": "pass"
+    },
+    {
+      "name": "layout-844",
+      "status": "pass"
+    },
+    {
+      "name": "layout-768",
+      "status": "pass"
+    },
+    {
+      "name": "reduced-motion",
+      "status": "pass"
+    },
+    {
+      "name": "webgl-disabled",
+      "status": "pass"
+    },
+    {
+      "name": "corrupt-storage",
+      "status": "pass"
+    },
+    {
+      "name": "frame-samples",
+      "samples": [
+        {
+          "id": "top",
+          "median": 16.69999999999891,
+          "p95": 16.700000000000728,
+          "over50": 0
+        },
+        {
+          "id": "icons",
+          "median": 16.69999999999891,
+          "p95": 16.700000000000728,
+          "over50": 0
+        },
+        {
+          "id": "featured",
+          "median": 16.69999999999891,
+          "p95": 16.700000000000728,
+          "over50": 0
+        },
+        {
+          "id": "news",
+          "median": 16.700000000000728,
+          "p95": 16.700000000000728,
+          "over50": 0
+        }
+      ]
+    },
+    {
+      "name": "scroll-performance",
+      "status": "pass"
+    }
+  ],
+  "crossBrowser": [
+    {
+      "name": "wheel-scroll",
+      "frames": 349,
+      "median": 16.69999999999891,
+      "p95": 16.799999999999272,
+      "over50": 3
+    },
+    {
+      "name": "chromium",
+      "status": "pass"
+    },
+    {
+      "name": "webkit",
+      "status": "pass"
+    },
+    {
+      "name": "models-unavailable",
+      "status": "pass"
+    }
+  ],
+  "mobileIdle": {
+    "stage": [
+      "MOMENTS: unchanged render counter and identical product pixels after settling",
+      "ICONS: unchanged render counter and identical product pixels after settling"
+    ],
+    "inspector": "All 4 products: unchanged pixels at rest; gesture reaches 100; renderer stops again afterward; Chrome and WebKit",
+    "physics": [
+      {
+        "engine": "chromium",
+        "settled": true,
+        "wakesOnInteraction": true,
+        "settlesAgain": true
+      },
+      {
+        "engine": "webkit",
+        "settled": true,
+        "wakesOnInteraction": true,
+        "settlesAgain": true
+      }
+    ],
+    "initialFinding": "WebKit physics retained one awake body after 10 seconds. Fixed by sleeping the mobile pile after 6 seconds without interaction, verified wake and re-settle in both engines."
+  },
+  "fixes": [
+    "Reuse entered state on route return; clean up Lenis and GSAP effects on unmount",
+    "Mobile menu focus/escape/scroll handling; keyboard product tabs",
+    "Short viewports use a readable unpinned layout",
+    "Graceful WebGL fallback, model load failure and invalid local storage handling",
+    "Cancel conflicting product tweens and async callbacks after unmount",
+    "Mobile: stop automatic spin, floating and pointer tilt; render only during changes",
+    "Mobile: cap pixel ratio, use studio lighting, reduce crowd and physics objects, stop idle physics",
+    "Hide inactive 3D crowd; skip hidden-page updates",
+    "Remove requests for unavailable local font files; wrap long card text"
+  ],
+  "openItems": [
+    {
+      "severity": "content",
+      "item": "4 product detail routes still show Coming soon; team detail pages are not yet integrated."
+    },
+    {
+      "severity": "content",
+      "item": "5 Stories, 5 Today, 4 News items retain placeholder/no-op links; Today and News use example content."
+    },
+    {
+      "severity": "performance",
+      "item": "Large 3D JS chunk (about 903 kB minified) and banana GLB (about 7 MB) remain. Slow-network first loads and physical low-end devices need separate testing."
+    }
+  ],
+  "limits": [
+    "Automated mobile emulation and WebKit engine checks are not physical-device testing.",
+    "Frame samples describe this desktop test environment, not guaranteed mobile FPS."
+  ],
+  "validation": {
+    "typecheck": "passed",
+    "localProductionBuild": "passed before final physics settling adjustment; final adjustment typechecked and tested via local dev server",
+    "productionFunctionalRegression": "1440 and 390 widths passed after first audit deployment",
+    "productionMobilePhysics": [
+      {
+        "engine": "chromium",
+        "settled": true,
+        "wakesOnInteraction": true,
+        "settlesAgain": true
+      },
+      {
+        "engine": "webkit",
+        "settled": true,
+        "wakesOnInteraction": true,
+        "settlesAgain": true
+      }
+    ],
+    "previousDeployment": {
+      "status": "READY",
+      "id": "dpl_EusXfzELZEkgYyY5yg1parRfeWVy",
+      "productionUrl": "https://binggrae-moment.vercel.app",
+      "productionBuild": "passed",
+      "warning": "3D bundle exceeds 500 kB; no missing font build warnings",
+      "liveVerification": "passed in Chrome and WebKit"
+    }
+  },
+  "mobileTouchFollowup": {
+    "reportedDevices": [
+      "Galaxy",
+      "KakaoTalk and Instagram in-app browsers",
+      "iPhone"
+    ],
+    "reproduced": [
+      "A native vertical touch on the 3D canvas emitted pointercancel and scrolled the page by 115px.",
+      "At 664px viewport height the product track was static and featured chapters had no touch controls."
+    ],
+    "changes": [
+      "Mobile uses native page scrolling rather than Lenis touch handling.",
+      "3D canvas captures touch gestures; outside the canvas scrolls normally.",
+      "Mobile product gallery supports native horizontal swipes and explicit product selection buttons.",
+      "Featured chapters are selectable by touch, including short viewports.",
+      "The product and a compact action button/slider share one visible panel."
+    ],
+    "verified": [
+      {
+        "engine": "chromium",
+        "nativeTaps": true,
+        "nativeSwipes": true,
+        "errors": []
+      },
+      {
+        "engine": "webkit",
+        "nativeTaps": true,
+        "nativeSwipes": false,
+        "errors": []
+      }
+    ],
+    "limits": "Native swipe injection verified in Chromium; native taps verified in Chromium and WebKit. Physical Galaxy, iPhone, KakaoTalk and Instagram apps were not available to this agent."
+  },
+  "regressionNote": "Broad regression tests above describe the preceding audit build. The touch follow-up supersedes the former static short-viewport Icons/Featured behavior."
+}

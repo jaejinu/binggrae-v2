@@ -4,6 +4,8 @@ import { stories } from '~/data/content'
 
 // 06. BINGGRAE STORIES — Magazine / Editorial
 const root = ref<HTMLElement>()
+let ctx: gsap.Context | undefined
+onBeforeUnmount(() => ctx?.revert())
 
 // 커버에 마우스를 올리면 물결처럼 일렁이는 왜곡 (카드마다 별도 SVG 필터)
 function ripple(i: number, on: boolean) {
@@ -30,6 +32,8 @@ function ripple(i: number, on: boolean) {
 }
 useSectionColor(root, () => ({ bg: '#fffdf6' }))
 onMounted(() => {
+  ctx = gsap.context(() => {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
   gsap.from(root.value!.querySelectorAll('.story'), {
     y: 60,
     opacity: 0,
@@ -38,6 +42,7 @@ onMounted(() => {
     ease: 'power3.out',
     scrollTrigger: { trigger: root.value!.querySelector('.stories__grid'), start: 'top 75%' },
   })
+  }, root.value)
 })
 </script>
 

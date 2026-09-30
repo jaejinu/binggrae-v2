@@ -1,0 +1,8 @@
+export const archive = [
+ { no:'01',tag:'1974 / THE SHAPE',title:'익숙함은 모양에서 시작됩니다.',text:'1974년 출시된 바나나맛우유. 빙그레는 달항아리에서 출발한 단지 모양을 제품의 특징으로 소개합니다.',image:'/products/teum/banana.png',caption:'현재 바나나맛우유 패키지 · 1974년 패키지 사진이 아닙니다.',source:'https://www.bing.co.kr/product/detail?PDT=123'},
+ { no:'02',tag:'2024 / THE PACKAGE',title:'같은 단지, 새로운 한마디.',text:'50주년 한정 ‘단지, 용기’ 에디션에는 자신의 문구를 적을 수 있는 자리가 생겼습니다. 익숙한 패키지가 나만의 메시지가 됩니다.',image:'/archive/courage-2024.png',caption:'2024년 ‘단지, 용기’ 에디션 · 빙그레 공식 보도자료',source:'https://www.bing.co.kr/news/news_announced_view?anno_idx=193'},
+ { no:'03',tag:'2024 / TOGETHER',title:'동갑내기의 만남.',text:'1974년에 탄생한 두 브랜드가 50주년을 함께 기념했습니다. 투게더맛우유는 단지에 또 다른 익숙한 이름을 담은 제품입니다.',image:'/archive/together-2024.png',caption:'2024년 투게더맛우유 · 빙그레 공식 보도자료',source:'https://www.bing.co.kr/news/news_announced_view?anno_idx=181'},
+ { no:'04',tag:'2024 / CAMPAIGN',title:'단지에 용기를 적다.',text:'처음이 어렵고 망설여지는 순간. ‘단지, 용기’ 캠페인은 단지라는 모양과 용기라는 마음을 연결했습니다.',image:'/archive/courage-2024.png',caption:'50주년 캠페인에 사용된 공식 패키지 이미지',source:'https://www.bing.co.kr/news/news_announced_view?anno_idx=193'},
+ { no:'05',tag:'2024 / THE PEOPLE',title:'기억이 모이면 한 권의 책.',text:'2024년 12월 발간된 브랜드북은 마케터의 시선과 소비자의 기억을 함께 담았습니다. 패키지·광고·사람의 이야기를 한 권으로 연결한 기록입니다.',image:'/archive/book-2024.jpg',caption:'『단지, 50년의 이야기』 표지 · 빙그레 공식 보도자료',source:'https://www.bing.co.kr/news/news_announced_view?anno_idx=250'},
+ { no:'06',tag:'TODAY / YOUR MOMENT',title:'다음 페이지는 당신의 순간.',text:'하교하던 길, 잠깐의 휴식, 누군가와 나눈 간식. 오늘의 작은 즐거움을 당신의 문장으로 남겨보세요.',image:'/products/teum/banana.png',caption:'현재 제품 이미지 · 이 페이지는 비공식 브랜드 리뉴얼 콘셉트입니다.',source:'https://www.bing.co.kr/product/detail?PDT=123'},
+]

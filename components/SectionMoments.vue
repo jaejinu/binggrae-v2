@@ -5,6 +5,8 @@ import { products } from '~/data/content'
 // 제품 카테고리가 아니라 "하루의 순간"으로 제품을 발견
 const active = ref(0)
 const root = ref<HTMLElement>()
+let ctx: gsap.Context | undefined
+onBeforeUnmount(() => ctx?.revert())
 const current = computed(() => products[active.value])
 const { blip } = useSound()
 
@@ -14,11 +16,16 @@ watch(active, (i: number) => blip(1 + i * 0.12))
 
 watch(active, async () => {
   await nextTick()
+  if (!root.value || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+  ctx?.add(() => {
   gsap.fromTo(root.value!.querySelector('.moments__art'), { scale: 0.6, rotate: -14, y: 40 }, { scale: 1, rotate: 0, y: 0, duration: 0.7, ease: 'back.out(2)' })
-  gsap.fromTo(root.value!.querySelectorAll('.moments__detail > *'), { y: 16, opacity: 0 }, { y: 0, opacity: 1, stagger: 0.06, duration: 0.4 })
+  gsap.fromTo(root.value!.querySelectorAll('.moments__detail > *'), { y: 16, opacity: 0 }, { y: 0, opacity: 1, stagger: 0.06, duration: 0.4, overwrite: true })
+  })
 })
 
 onMounted(() => {
+  ctx = gsap.context(() => {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
   gsap.from(root.value!.querySelectorAll('.moments__list li'), {
     x: -60,
     opacity: 0,
@@ -27,6 +34,7 @@ onMounted(() => {
     ease: 'back.out(1.6)',
     scrollTrigger: { trigger: root.value, start: 'top 65%' },
   })
+  }, root.value)
 })
 </script>
 

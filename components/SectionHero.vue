@@ -40,6 +40,7 @@ function computeShifts(els: HTMLElement[]) {
 }
 
 onMounted(() => {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
   ctx = gsap.context(() => {
     const els = gsap.utils.toArray<HTMLElement>('.hero__token')
     let shifts = computeShifts(els)
@@ -63,10 +64,10 @@ onMounted(() => {
       })
       .to('.hero__intro', { opacity: 0, y: -40, duration: 0.25 }, 0)
       .to(els, { x: (_i: number, el: HTMLElement) => shifts.get(el) ?? 0, ease: 'power2.inOut', duration: 1 }, 0)
-      .to(els, { opacity: 0.16, duration: 0.5 }, 0.45)
+      .to(els, { opacity: 0.08, duration: 0.5 }, 0.45)
       .fromTo('.hero__product', { scale: 0, rotate: -30 }, { scale: 1, rotate: 0, ease: 'back.out(1.6)', duration: 0.6 }, 0.5)
       .fromTo('.hero__spark', { scale: 0 }, { scale: 1, stagger: 0.05, duration: 0.3, ease: 'back.out(3)' }, 0.75)
-      .fromTo('.hero__tag-line', { yPercent: 100, opacity: 0 }, { yPercent: 0, opacity: 1, stagger: 0.12, duration: 0.4 }, 0.85)
+      .fromTo('.hero__tag-line', { yPercent: 100, opacity: 0 }, { yPercent: 0, opacity: 1, stagger: 0.06, duration: 0.18 }, 0.64)
   }, root.value)
 })
 
@@ -75,8 +76,11 @@ watch(
   () => props.started,
   (on: boolean) => {
     if (!on) return
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    ctx?.add(() => {
     gsap.to(root.value!.querySelectorAll('.hero__token'), { yPercent: 0, opacity: 1, duration: 0.7, stagger: { each: 0.02, from: 'random' }, ease: 'back.out(1.6)' })
     gsap.from(root.value!.querySelectorAll('.hero__intro > *'), { scale: 0.4, opacity: 0, delay: 0.5, stagger: 0.1, ease: 'back.out(2)' })
+    })
   },
 )
 
@@ -107,8 +111,8 @@ onBeforeUnmount(() => ctx?.revert())
       </div>
 
       <p class="hero__tagline ko-display size-md">
-        <span class="hero__tag-line --l sticker-text">{{ brand.tagline[0] }}</span>
-        <span class="hero__tag-line --r sticker-text">{{ brand.tagline[1] }}</span>
+        <span class="hero__tag-line --l">{{ brand.tagline[0] }}</span>
+        <span class="hero__tag-line --r">{{ brand.tagline[1] }}</span>
       </p>
     </div>
   </section>
@@ -207,6 +211,12 @@ onBeforeUnmount(() => ctx?.revert())
   display: block;
   opacity: 0;
   font-size: clamp(22px, 2.4vw, 40px);
+  color: #1a1a1a;
+  background: #fff6e0;
+  padding: .32em .5em;
+  border: 2px solid #1a1a1a;
+  border-radius: 12px;
+  box-shadow: 4px 4px 0 #1a1a1a;
 }
 .hero__tag-line.--l {
   right: calc(50% + clamp(100px, 11vw, 180px));
@@ -224,8 +234,8 @@ onBeforeUnmount(() => ctx?.revert())
     font-size: 11.5vw;
   }
   .hero__tag-line {
-    left: 0 !important;
-    right: 0 !important;
+    left: 6% !important;
+    right: 6% !important;
     text-align: center !important;
     translate: none;
   }
@@ -236,5 +246,11 @@ onBeforeUnmount(() => ctx?.revert())
     top: auto;
     bottom: 16%;
   }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero__schedule { opacity: .08; }
+  .hero__product { transform: none; }
+  .hero__spark { display: none; }
+  .hero__intro { z-index: 1; }
 }
 </style>

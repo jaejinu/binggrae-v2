@@ -43,6 +43,7 @@ export function useSound() {
   const enabled = useState('sound-enabled', () => false)
 
   function set(on: boolean) {
+    if (!on && !ctx) { enabled.value = false; return }
     ensureGraph()
     if (!ctx || !master) return
     if (ctx.state === 'suspended') ctx.resume()

@@ -13,6 +13,8 @@ const SIZE = 1.45 // 제품 높이 (월드 단위)
 
 let dropImpl: ((key?: ProductKey, x?: number) => void) | undefined
 let cleanup: (() => void) | undefined
+let disposed = false
+const unavailable = ref(false)
 
 function drop(key?: ProductKey) {
   dropImpl?.(key)
@@ -20,17 +22,22 @@ function drop(key?: ProductKey) {
 defineExpose({ drop })
 
 onMounted(async () => {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { unavailable.value = true; return }
   const el = host.value!
+  const mobile = window.matchMedia('(pointer: coarse)').matches || window.innerWidth <= 800
+  let dirty = true
+  let lastInteraction = performance.now()
   let renderer: THREE.WebGLRenderer
   try {
     renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
   } catch {
+    unavailable.value = true
     return
   }
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75))
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, mobile ? 1 : 1.75))
   renderer.outputColorSpace = THREE.SRGBColorSpace
   renderer.toneMapping = THREE.NeutralToneMapping
-  renderer.shadowMap.enabled = true
+  renderer.shadowMap.enabled = !mobile
   renderer.shadowMap.type = THREE.PCFShadowMap
   el.appendChild(renderer.domElement)
 
@@ -82,6 +89,7 @@ onMounted(async () => {
   }
 
   const resize = () => {
+    dirty = true
     const w = el.clientWidth
     const h = el.clientHeight
     renderer.setSize(w, h)
@@ -95,13 +103,21 @@ onMounted(async () => {
   const ro = new ResizeObserver(resize)
   ro.observe(el)
   resize()
+  const disposeBase = () => {
+    ro.disconnect()
+    scene.environment?.dispose()
+    floorMesh.geometry.dispose(); floorMesh.material.dispose(); sun.shadow.dispose()
+    pmrem.dispose(); renderer.dispose(); renderer.domElement.remove()
+  }
+  cleanup = disposeBase
 
   // ---- 제품 ----
   const keys = products.map((p) => p.key)
   const gltfs = await Promise.all(keys.map((k) => loadProductGLTF(k)))
+  if (disposed) return
   if (gltfs.some((g) => !g)) {
-    renderer.dispose()
-    renderer.domElement.remove()
+    unavailable.value = true
+    disposeBase(); cleanup = undefined
     return
   }
   ready.value = true
@@ -121,11 +137,14 @@ onMounted(async () => {
       key === 'samanco'
         ? new CANNON.Box(new CANNON.Vec3(size.x / 2, size.y / 2, size.z / 2))
         : new CANNON.Cylinder(Math.min(size.x, size.z) * 0.42, Math.min(size.x, size.z) * 0.42, size.y, 12)
-    const body = new CANNON.Body({ mass: 1, material: mat, shape, angularDamping: 0.2, linearDamping: 0.05 })
+    const body = new CANNON.Body({ mass: 1, material: mat, shape, angularDamping: 0.3, linearDamping: 0.1, allowSleep: true, sleepSpeedLimit: .2, sleepTimeLimit: .6 })
     return { body, obj: rig.group }
   }
 
   dropImpl = (key, x) => {
+    if (disposed) return
+    dirty = true
+    lastInteraction = performance.now()
     const k = key ?? keys[Math.floor(Math.random() * keys.length)]
     const it = makeItem(k)
     it.body.position.set(x ?? (Math.random() - 0.5) * halfW * 1.4, halfH + 2.5, (Math.random() - 0.5) * 0.6)
@@ -135,7 +154,7 @@ onMounted(async () => {
     scene.add(it.obj)
     gsap.from(it.obj.scale, { x: 0.3, y: 0.3, z: 0.3, duration: 0.4, ease: 'back.out(2)' })
     items.push(it)
-    if (items.length > MAX) {
+    if (items.length > (mobile ? 8 : MAX)) {
       const old = items.shift()!
       world.removeBody(old.body)
       gsap.to(old.obj.scale, { x: 0, y: 0, z: 0, duration: 0.3, onComplete: () => scene.remove(old.obj) })
@@ -155,6 +174,8 @@ onMounted(async () => {
     return ray.ray.intersectPlane(plane, hit)
   }
   const onMove = (e: PointerEvent) => {
+    dirty = true
+    lastInteraction = performance.now()
     const p = toWorld(e)
     if (!p) return
     const prev = pusher.position.clone()
@@ -162,7 +183,7 @@ onMounted(async () => {
     pusher.velocity.set((p.x - prev.x) * 30, (p.y - prev.y) * 30, 0)
     items.forEach((it) => it.body.wakeUp())
   }
-  const onLeave = () => pusher.position.set(0, -50, 0)
+  const onLeave = () => { pusher.position.set(0, -50, 0); pusher.velocity.setZero() }
   const onClick = (e: PointerEvent) => {
     const p = toWorld(e)
     dropImpl?.(undefined, p ? THREE.MathUtils.clamp(p.x, -halfW + 0.6, halfW - 0.6) : undefined)
@@ -183,36 +204,43 @@ onMounted(async () => {
   })
   io.observe(el)
 
-  const tick = () => {
-    if (!visible) return
+  const tick = (_time: number, deltaMs: number) => {
+    if (!visible || document.hidden || disposed) return
+    // Stop tiny residual collision oscillations after a mobile interaction has settled.
+    // Dragging/tapping wakes the bodies again, so the pile remains interactive.
+    if (mobile && performance.now() - lastInteraction > 6000) items.forEach(it => it.body.sleep())
+    const awake = items.filter(it => it.body.sleepState !== CANNON.Body.SLEEPING).length
+    el.dataset.awake = String(awake)
+    if (!dirty && awake === 0) return
     // 1/60초 고정 간격, 프레임이 늦어지면 최대 10단계까지 따라잡는다
-    world.fixedStep(1 / 60, 10)
+    world.step(1 / 60, Math.min(deltaMs / 1000, .05), 3)
+    pusher.velocity.setZero()
     items.forEach(({ body, obj }) => {
       obj.position.set(body.position.x, body.position.y, body.position.z)
       obj.quaternion.set(body.quaternion.x, body.quaternion.y, body.quaternion.z, body.quaternion.w)
     })
     renderer.render(scene, camera)
+    dirty = false
   }
   gsap.ticker.add(tick)
 
   cleanup = () => {
+    dropImpl = undefined
+    items.forEach(({ obj }) => { gsap.killTweensOf(obj.scale); obj.traverse(o => { const m = o as THREE.Mesh; if (m.isMesh) (Array.isArray(m.material) ? m.material : [m.material]).forEach(mat => mat.dispose()) }) })
     gsap.ticker.remove(tick)
     io.disconnect()
-    ro.disconnect()
     el.removeEventListener('pointermove', onMove)
     el.removeEventListener('pointerleave', onLeave)
     el.removeEventListener('click', onClick)
-    pmrem.dispose()
-    renderer.dispose()
-    renderer.domElement.remove()
+    disposeBase()
   }
 })
 
-onBeforeUnmount(() => cleanup?.())
+onBeforeUnmount(() => { disposed = true; cleanup?.() })
 </script>
 
 <template>
-  <div class="phys card">
+  <div v-show="!unavailable" class="phys card">
     <div ref="host" class="phys__canvas" data-cursor="PUSH" />
     <p class="phys__hint body-m">
       <span class="kicker">오늘의 틈 모으기</span>

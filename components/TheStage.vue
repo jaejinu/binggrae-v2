@@ -17,9 +17,11 @@ import { products, type ProductKey } from '~/data/content'
 
 const canvasHost = ref<HTMLDivElement>()
 let cleanup: (() => void) | undefined
+let disposed = false
 
 onMounted(async () => {
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+  const mobile = window.matchMedia('(pointer: coarse)').matches || window.innerWidth <= 800
 
   let renderer: THREE.WebGLRenderer
   try {
@@ -27,7 +29,7 @@ onMounted(async () => {
   } catch {
     return // WebGL을 못 쓰면 렌더 이미지 그대로
   }
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75))
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, mobile ? 1 : 1.75))
   renderer.outputColorSpace = THREE.SRGBColorSpace
   renderer.toneMapping = THREE.NeutralToneMapping
   canvasHost.value!.appendChild(renderer.domElement)
@@ -50,13 +52,23 @@ onMounted(async () => {
   }
   resize()
   window.addEventListener('resize', resize)
+  const disposeBase = () => {
+    window.removeEventListener('resize', resize)
+    disposeProductEnvs(renderer)
+    studio.dispose()
+    pmrem.dispose()
+    renderer.dispose()
+    renderer.domElement.remove()
+  }
+  cleanup = disposeBase
 
   // ---- 제품 리그 ------------------------------------------------------------
   const keys = products.map((p) => p.key)
   const gltfs = await Promise.all(keys.map((k) => loadProductGLTF(k)))
+  if (disposed) return
   if (gltfs.some((g) => !g)) {
-    renderer.dispose()
-    renderer.domElement.remove()
+    disposeBase()
+    cleanup = undefined
     return // 모델이 없으면 렌더 이미지 그대로
   }
   const rigs = new Map<ProductKey, ProductRig>()
@@ -72,7 +84,7 @@ onMounted(async () => {
   const jar = rigs.get('bananaMilk')!
   // SHAPE: 와이어프레임 겹치기
   const wireMat = new THREE.MeshBasicMaterial({ color: '#1a1a1a', wireframe: true, transparent: true, opacity: 0, depthWrite: false })
-  jar.meshes.forEach((m) => m.add(new THREE.Mesh(m.geometry, wireMat)))
+  jar.meshes.filter((m) => /Bottle_Body|Bottle_Seam|Base_Ring/.test(m.name)).forEach((m) => m.add(new THREE.Mesh(m.geometry, wireMat)))
   // COLOR: 몸통 색 변주
   const bodyMats = jar.meshes
     .filter((m) => /body/i.test(m.name) || /body/i.test(m.parent?.name ?? ''))
@@ -108,9 +120,10 @@ onMounted(async () => {
   jar.spin.add(sparks)
   // PEOPLE: 주위를 도는 작은 단지들
   const crowd = new THREE.Group()
-  for (let i = 0; i < 10; i++) {
+  const crowdCount = mobile ? 3 : 10
+  for (let i = 0; i < crowdCount; i++) {
     const r = makeRig(gltfs[keys.indexOf('bananaMilk')]!, 'bananaMilk', { size: 0.9 })
-    const a = (i / 10) * Math.PI * 2
+    const a = (i / crowdCount) * Math.PI * 2
     r.group.position.set(Math.cos(a) * 1.9, (i % 3) * 0.35 - 0.35, Math.sin(a) * 1.9)
     crowd.add(r.group)
   }
@@ -120,13 +133,14 @@ onMounted(async () => {
   // ---- 상태 -------------------------------------------------------------------
   const pointer = { x: 0, y: 0 }
   const onMove = (e: PointerEvent) => {
+    if (mobile) return
     pointer.x = (e.clientX / window.innerWidth) * 2 - 1
     pointer.y = (e.clientY / window.innerHeight) * 2 - 1
   }
   window.addEventListener('pointermove', onMove)
 
   const cur = { x: 0, y: 0, h: 0, progress: 1 }
-  const swap = { s: 0 }
+  const swap = { s: 0, x: 0, y: 0, rz: 0, open: 0 }
   let shown: ProductKey | null = null
   let wanted: ProductKey | null = null
   let spinY = 0
@@ -134,8 +148,9 @@ onMounted(async () => {
   const fx = [0, 0, 0, 0, 0, 0] // 챕터별 연출 강도
 
   const applyEnv = async (k: ProductKey) => {
+    if (mobile) return // Use the stable studio lighting on mobile; avoid HDR decode/upload during interaction.
     const tex = await loadProductEnv(renderer, pmrem, k)
-    if (tex && shown === k) {
+    if (!disposed && tex && shown === k) {
       scene.environment = tex
       scene.environmentRotation.set(0, envRotation(k), 0)
     }
@@ -148,17 +163,23 @@ onMounted(async () => {
       if (shown) rigs.get(shown)!.group.visible = false
       shown = wanted
       rigs.get(shown!)!.group.visible = true
-      spinKick += Math.PI
+      spinY=0
+      spinKick = shown==='samanco' ? -.45 : shown==='bravo' ? .5 : -.25
+      const entrance={yoplait:{x:0,y:.25,rz:-.15,open:1},samanco:{x:-1.4,y:0,rz:-.2,open:0},bravo:{x:0,y:-1.2,rz:.25,open:0},bananaMilk:{x:.4,y:.1,rz:-.15,open:0}}[shown!]
+      Object.assign(swap,entrance)
       applyEnv(shown!)
-      gsap.to(swap, { s: 1, duration: 0.55, ease: 'back.out(1.7)' })
+      gsap.to(swap, { s: 1,x:0,y:0,rz:0,open:0,duration:shown==='samanco'?.95:.8,ease:'power3.out' })
     }
     if (shown && swap.s > 0.01) gsap.to(swap, { s: 0, duration: 0.18, ease: 'power2.in', onComplete: enter })
     else enter()
   }
 
   const clamp01 = (v: number) => Math.min(1, Math.max(0, v))
+  let lastFrame = ''
+  let renderCount = 0
 
   const tick = (_time: number, deltaMs: number) => {
+    if (document.hidden || disposed) return
     const dt = Math.min(deltaMs, 64) / 1000
     const k = 1 - Math.pow(0.0008, dt) // 프레임과 무관한 부드러운 따라가기
     const vw = window.innerWidth
@@ -229,57 +250,72 @@ onMounted(async () => {
     const fw = sw > 0 ? featuredW / sw : 0
     fx.forEach((v, i) => (fx[i] = v + ((i === chapter ? fw : 0) - v) * k))
 
-    if (!shown) return renderer.render(scene, camera)
+    if (mobile) {
+      const frame = [shown, ...[cur.x, cur.y, cur.h, cur.progress, swap.s, swap.x, swap.y, swap.rz, swap.open, ...fx].map(v => Math.round(Number(v) * 1000))].join(':')
+      if (frame === lastFrame) return
+      lastFrame = frame
+    }
+
+    if (!shown) return
+    if (cur.h < .5) {
+      renderer.clear()
+      return
+    }
     const rig = rigs.get(shown)!
 
     // 3) 화면 좌표 → 월드 좌표
     const visH = 2 * camera.position.z * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))
     const px2w = visH / vh
-    rig.group.position.set((cur.x - vw / 2) * px2w, -(cur.y - vh / 2) * px2w, 0)
+    rig.group.position.set((cur.x - vw / 2) * px2w, -(cur.y - vh / 2) * px2w + swap.y, 0)
+    rig.group.position.x += swap.x
     const s = ((cur.h * px2w * 0.95) / 2.8) * swap.s * (1 + fx[5] * 0.12)
     rig.group.scale.setScalar(Math.max(s, 0.0001))
     rig.group.visible = s > 0.001
 
     // 4) 회전: 기본 천천히 + 교체 시 한 바퀴 + 포인터 + AD 챕터에서 빠르게
-    spinY += dt * (0.35 + fx[3] * 2.2)
+    if (!mobile) spinY += dt * .6
     spinKick *= Math.pow(0.02, dt)
-    rig.spin.rotation.y = spinY + spinKick + pointer.x * 0.35
-    rig.spin.rotation.x = pointer.y * 0.12
+    rig.spin.rotation.y = mobile ? 0 : Math.sin(spinY)*.24 + spinKick + pointer.x*.3 + fx[4]*Math.PI
+    rig.spin.rotation.z=swap.rz
+    rig.spin.rotation.x = mobile ? 0 : pointer.y * 0.12
 
     // 5) 조립 애니메이션 + PACKAGE 챕터 분해
-    rig.pose(cur.progress, shown === 'bananaMilk' ? fx[2] : 0)
+    rig.pose(cur.progress, shown === 'bananaMilk' ? fx[2] : shown==='yoplait'?swap.open:0)
 
     // 6) 브랜드북 연출 (바나나우유)
     if (shown === 'bananaMilk') {
-      wireMat.opacity = fx[0] * 0.45
-      const hue = new THREE.Color().setHSL((performance.now() / 1000) * 0.12 % 1, 0.85, 0.55)
+      wireMat.opacity = mobile ? 0 : fx[0] * 0.45
+      const hue = new THREE.Color('#ffdf79')
       bodyMats.forEach((m, i) => m.color.copy(baseColors[i]).lerp(hue, fx[1] * 0.85))
       sparkMat.opacity = fx[3]
-      sparks.rotation.y += dt * 0.6
+      sparks.visible = fx[3] > .005
+      if (!mobile) sparks.rotation.y += dt * 0.6
       crowd.scale.setScalar(Math.max(fx[4], 0.0001))
-      crowd.rotation.y += dt * 0.5
+      crowd.visible = fx[4] > .005
+      if (!mobile) crowd.rotation.y += dt * 0.5
     }
 
     renderer.render(scene, camera)
+    canvasHost.value!.dataset.frames = String(++renderCount)
   }
   gsap.ticker.add(tick)
 
   cleanup = () => {
+    gsap.killTweensOf(swap)
     gsap.ticker.remove(tick)
-    window.removeEventListener('resize', resize)
     window.removeEventListener('pointermove', onMove)
     document.documentElement.classList.remove('stage-ready')
     scene.traverse((o) => {
       const m = o as THREE.Mesh
-      if (m.geometry) m.geometry.dispose()
+      // Model geometry/textures belong to the shared GLTF cache; only cloned materials are ours.
+      if (m.isMesh) (Array.isArray(m.material) ? m.material : [m.material]).forEach(mat => mat.dispose())
     })
-    pmrem.dispose()
-    renderer.dispose()
-    renderer.domElement.remove()
+    sparkGeo.dispose(); sparkTex.dispose(); wireMat.dispose()
+    disposeBase()
   }
 })
 
-onBeforeUnmount(() => cleanup?.())
+onBeforeUnmount(() => { disposed = true; cleanup?.() })
 </script>
 
 <template>

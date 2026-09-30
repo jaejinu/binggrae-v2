@@ -7,26 +7,47 @@ const emit = defineEmits<{ start: [] }>()
 const { set: setSound } = useSound()
 const root = ref<HTMLElement>()
 const ready = ref(false)
+const starting = ref(false)
+let ctx: gsap.Context | undefined
+const reduced = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
 onMounted(() => {
+  if (reduced()) { ready.value = true; return }
+  ctx = gsap.context(() => {
   gsap
     .timeline({ onComplete: () => (ready.value = true) })
     .from('.pre__item', { y: 80, scale: 0, rotate: -40, stagger: 0.1, duration: 0.6, ease: 'back.out(2.2)' })
     .to('.pre__item', { y: -20, duration: 0.3, ease: 'power1.out', yoyo: true, repeat: 1, stagger: 0.08 })
+  }, root.value)
 })
+onBeforeUnmount(() => ctx?.revert())
+watch(ready, async () => { await nextTick(); root.value?.querySelector<HTMLButtonElement>('button')?.focus({ preventScroll: true }) })
+
+function trapFocus(event: KeyboardEvent) {
+  const buttons = root.value?.querySelectorAll<HTMLButtonElement>('button')
+  if (!buttons?.length) return
+  const first = buttons[0]!, last = buttons[buttons.length - 1]!
+  if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus() }
+  else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() }
+}
 
 function start(withSound: boolean) {
-  if (withSound) setSound(true)
+  if (starting.value) return
+  starting.value = true
+  setSound(withSound)
+  if (reduced()) { emit('start'); return }
+  ctx?.add(() => {
   gsap
     .timeline({ onComplete: () => emit('start') })
     .to('.pre__item', { y: -window.innerHeight, rotate: 60, stagger: 0.05, duration: 0.6, ease: 'back.in(1.4)' })
     .to('.pre__center', { scale: 0.6, opacity: 0, duration: 0.3 }, '<')
     .to(root.value!, { yPercent: -100, duration: 0.8, ease: 'expo.inOut' }, '-=0.2')
+  })
 }
 </script>
 
 <template>
-  <div ref="root" class="pre">
+  <div ref="root" class="pre" role="dialog" aria-modal="true" aria-label="빙그레할 틈 시작" @keydown.tab="trapFocus">
     <div class="pre__row" aria-hidden="true">
       <div v-for="p in products" :key="p.key" class="pre__item">
         <ProductArt :product="p.key" />

@@ -75,4 +75,7 @@ const hasImage = useImageAvailable(() => info.value.image)
   0%, 100% { transform: translateY(0) rotate(-1deg); }
   50% { transform: translateY(-6px) rotate(1deg); }
 }
+@media (pointer: coarse), (max-width: 800px) {
+  .product-art--img { animation: none; }
+}
 </style>

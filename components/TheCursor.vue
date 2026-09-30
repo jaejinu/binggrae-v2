@@ -48,6 +48,7 @@ function burst(x: number, y: number) {
 }
 
 onMounted(() => {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
   enabled.value = window.matchMedia('(pointer: fine)').matches
   const html = document.documentElement
 
@@ -80,8 +81,11 @@ onMounted(() => {
     })
     on('pointerdown', () => gsap.to(ring.value!, { scale: 0.7, duration: 0.15 }))
     on('pointerup', () => gsap.to(ring.value!, { scale: 1, duration: 0.4, ease: 'elastic.out(1, 0.4)' }))
-    document.addEventListener('mouseleave', () => gsap.to(ring.value!, { opacity: 0 }))
-    document.addEventListener('mouseenter', () => gsap.to(ring.value!, { opacity: 1 }))
+    const leave = () => gsap.to(ring.value!, { opacity: 0 })
+    const enter = () => gsap.to(ring.value!, { opacity: 1 })
+    document.addEventListener('mouseleave', leave)
+    document.addEventListener('mouseenter', enter)
+    cleanups.push(() => { document.removeEventListener('mouseleave', leave); document.removeEventListener('mouseenter', enter); xTo.tween.kill(); yTo.tween.kill(); gsap.killTweensOf(ring.value!) })
   }
 
   // 클릭 반짝이 (터치 포함)

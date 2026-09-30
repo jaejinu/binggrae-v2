@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import gsap from 'gsap'
-import { brand, products, yourMoment } from '~/data/content'
+import { brand, products, yourMoment, type ProductKey } from '~/data/content'
 
 const root = ref<HTMLElement>()
 useSectionColor(root, () => ({ bg: '#7ed957' }))
@@ -8,7 +8,11 @@ useSectionColor(root, () => ({ bg: '#7ed957' }))
 // 10. 참여형 콘텐츠 — 이유 하나 고르고 한 줄 쓰면 그래픽 카드 생성
 const reason = ref(0)
 const text = ref('')
-const card = ref<{ reason: number; text: string; product: number; date: string } | null>(null)
+const chosen=useState<ProductKey>('chosen-product',()=> 'bananaMilk')
+const colors=['#fff6e0','#ffd43b','#ff9ebd','#8fd3ff']
+const color=ref(colors[0]!)
+const downloadStatus=ref('')
+const card = ref<{ reason: number; text: string; product: number; date: string; color?: string } | null>(null)
 const cardEl = ref<HTMLElement>()
 const saved = ref<typeof card.value[]>([])
 const physics = ref<{ drop: (key?: string) => void }>()
@@ -17,18 +21,21 @@ const STORAGE_KEY = 'binggrae-moments'
 
 onMounted(() => {
   try {
-    saved.value = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]').slice(0, 6)
+    const stored: unknown = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]')
+    saved.value = Array.isArray(stored) ? stored.filter(s => s && Number.isInteger(s.reason) && yourMoment.reasons[s.reason] && Number.isInteger(s.product) && products[s.product] && typeof s.text === 'string' && typeof s.date === 'string').slice(0, 6) : []
   } catch {
     saved.value = []
   }
 })
 
 async function make() {
+  downloadStatus.value = ''
   const now = new Date()
   card.value = {
     reason: reason.value,
-    text: text.value.trim() || '그냥, 오늘은 괜찮은 날.',
-    product: Math.floor(Math.random() * products.length),
+    text: text.value.trim().slice(0, 40) || '그냥, 오늘은 괜찮은 날.',
+    product: Math.max(0,products.findIndex(p=>p.key===chosen.value)),
+    color:color.value,
     date: `${now.getFullYear()}.${String(now.getMonth() + 1).padStart(2, '0')}.${String(now.getDate()).padStart(2, '0')}`,
   }
   saved.value = [card.value, ...saved.value].slice(0, 6)
@@ -39,7 +46,7 @@ async function make() {
   }
   physics.value?.drop(products[card.value.product].key)
   await nextTick()
-  gsap.fromTo(cardEl.value!, { scale: 0.4, rotate: -20, opacity: 0 }, { scale: 1, rotate: -3, opacity: 1, duration: 0.7, ease: 'back.out(2)' })
+  gsap.fromTo(cardEl.value!, { scale: 0.4, rotate: -20, opacity: 0 }, { scale: 1, rotate: -3, opacity: 1, duration: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 0.7, ease: 'back.out(2)', overwrite: true })
 }
 
 // 카드를 PNG로 저장 (캔버스에 직접 그림)
@@ -57,7 +64,7 @@ async function download() {
   g.fillRect(0, 0, W, H)
   g.fillStyle = '#1a1a1a'
   g.fillRect(90, 110, W - 160, H - 200)
-  g.fillStyle = '#fff6e0'
+  g.fillStyle = card.value.color || '#fff6e0'
   g.fillRect(80, 100, W - 160, H - 200)
   g.strokeStyle = '#1a1a1a'
   g.lineWidth = 8
@@ -75,10 +82,13 @@ async function download() {
   wrap(g, `“${card.value.text}”`, 140, 790, W - 280, 68)
   g.font = '44px "Black Han Sans", sans-serif'
   g.fillText(brand.name, 140, H - 160)
+  const img=new Image();img.src=products[card.value.product]!.image
+  try{await img.decode();g.drawImage(img,690,1000,245,255)}catch{downloadStatus.value='제품 이미지 로드에 실패했어요. 다시 저장해 주세요.';return}
   const a = document.createElement('a')
   a.href = c.toDataURL('image/png')
   a.download = 'binggrae-moment.png'
   a.click()
+  downloadStatus.value='제품과 문구가 담긴 카드를 저장했어요.'
 }
 
 function wrap(g: CanvasRenderingContext2D, s: string, x: number, y: number, max: number, lh: number) {
@@ -122,7 +132,9 @@ function wrap(g: CanvasRenderingContext2D, s: string, x: number, y: number, max:
           <input v-model="text" class="ym__input" maxlength="40" :placeholder="yourMoment.placeholder" />
           <span class="ym__count body-m">{{ text.length }}/40</span>
         </label>
-        <button type="submit" class="btn btn--dark">카드 만들기 ✦</button>
+        <fieldset class="ym__reasons"><legend class="kicker">03. 함께할 제품</legend><button v-for="p in products" :key="p.key" type="button" class="btn btn--sm" :aria-pressed="chosen===p.key" :style="chosen===p.key?{background:p.bg,color:p.ink}:undefined" @click="chosen=p.key">{{ p.nameKo }}</button></fieldset>
+        <fieldset class="ym__reasons"><legend class="kicker">04. 오늘의 색</legend><button v-for="(c,i) in colors" :key="c" type="button" class="ym__swatch" :aria-label="['크림','노랑','핑크','파랑'][i]" :aria-pressed="color===c" :style="{background:c}" @click="color=c">{{ color===c?'✓':'' }}</button></fieldset>
+        <button type="submit" class="btn btn--dark">카드 만들기 ✦</button><small>최근 카드는 이 브라우저에만 저장됩니다.</small>
       </form>
 
       <div class="ym__result">
@@ -130,7 +142,7 @@ function wrap(g: CanvasRenderingContext2D, s: string, x: number, y: number, max:
           v-if="card"
           ref="cardEl"
           class="ym__card card"
-          :style="{ '--c': yourMoment.reasons[card.reason].color }"
+          :style="{ '--c': yourMoment.reasons[card.reason].color, background:card.color||'#fff6e0' }"
         >
           <span class="en-display ym__card-kicker">My Binggrae Moment</span>
           <span class="body-m">{{ card.date }}</span>
@@ -142,8 +154,8 @@ function wrap(g: CanvasRenderingContext2D, s: string, x: number, y: number, max:
           </div>
           <span class="ko-display ym__card-brand">{{ brand.name }}</span>
         </div>
-        <p v-else class="ym__empty body-m">왼쪽에서 오늘의 순간을 골라보세요.<br />작은 카드가 만들어져요.</p>
-        <button v-if="card" class="btn" @click="download">이미지로 저장 ↓</button>
+        <p v-else class="ym__empty body-m">오늘의 순간을 골라보세요.<br />작은 카드가 만들어져요.</p>
+        <button v-if="card" class="btn" @click="download">이미지로 저장 ↓</button><p role="status">{{ downloadStatus }}</p>
       </div>
     </div>
 
@@ -163,6 +175,7 @@ function wrap(g: CanvasRenderingContext2D, s: string, x: number, y: number, max:
 </template>
 
 <style scoped>
+.ym__swatch{width:44px;height:44px;border:2px solid #1a1a1a;border-radius:50%;font-size:22px;color:#1a1a1a}.ym__swatch[aria-pressed="true"]{outline:2px solid #1a1a1a;outline-offset:3px}
 .ym__grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -222,6 +235,7 @@ function wrap(g: CanvasRenderingContext2D, s: string, x: number, y: number, max:
   position: relative;
   width: min(100%, 380px);
   aspect-ratio: 4 / 5;
+  min-height: 480px;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -250,6 +264,7 @@ function wrap(g: CanvasRenderingContext2D, s: string, x: number, y: number, max:
   margin-top: auto;
   font-size: 20px;
 }
+.ym__card > .body-l { overflow-wrap: anywhere; word-break: break-word; padding-bottom: 72px; }
 .ym__empty {
   display: grid;
   place-items: center;
@@ -280,7 +295,8 @@ function wrap(g: CanvasRenderingContext2D, s: string, x: number, y: number, max:
   font-size: 14px;
 }
 @media (max-width: 900px) {
-  .ym__grid {
+  .ym__swatch{width:44px;height:44px;border:2px solid #1a1a1a;border-radius:50%;font-size:22px;color:#1a1a1a}.ym__swatch[aria-pressed="true"]{outline:2px solid #1a1a1a;outline-offset:3px}
+.ym__grid {
     grid-template-columns: 1fr;
   }
 }

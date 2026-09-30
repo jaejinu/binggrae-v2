@@ -109,6 +109,7 @@ onMounted(() => {
 
   cleanup = () => {
     stop()
+    gsap.killTweensOf(uniforms.uProgress)
     gsap.ticker.remove(tick)
     window.removeEventListener('resize', resize)
     document.documentElement.classList.remove('liquid-bg')

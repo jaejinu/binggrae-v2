@@ -7,11 +7,19 @@ const root = ref<HTMLElement>()
 useSectionColor(root, () => ({ bg: '#ffd43b' }))
 const pin = ref<HTMLElement>()
 const active = ref(0)
-let ctx: gsap.Context | undefined
+let media: gsap.MatchMedia | undefined
+let timeline: gsap.core.Timeline | undefined
+const { scrollTo } = useSmoothScroll()
+function selectChapter(index: number) {
+  const st = timeline?.scrollTrigger
+  if (st) scrollTo(st.start + (st.end - st.start) * (index + .5) / featured.chapters.length)
+  else active.value = index
+}
 
 onMounted(() => {
-  ctx = gsap.context(() => {
-    gsap.timeline({
+  media = gsap.matchMedia()
+  media.add('(pointer: fine) and (min-width: 1001px) and (min-height: 701px) and (prefers-reduced-motion: no-preference)', () => {
+    timeline = gsap.timeline({
       scrollTrigger: {
         trigger: pin.value,
         start: 'top top',
@@ -25,10 +33,11 @@ onMounted(() => {
     })
       .fromTo('.featured__jar', { rotate: -12, scale: 0.8 }, { rotate: 12, scale: 1.05, ease: 'none' }, 0)
       .fromTo('.featured__year-fill', { scaleX: 0 }, { scaleX: 1, ease: 'none' }, 0)
+    return () => { timeline = undefined }
   }, root.value)
 })
 
-onBeforeUnmount(() => ctx?.revert())
+onBeforeUnmount(() => media?.revert())
 </script>
 
 <template>
@@ -51,11 +60,14 @@ onBeforeUnmount(() => ctx?.revert())
 
       <ol class="featured__chapters">
         <li v-for="(c, i) in featured.chapters" :key="c.no" :class="{ '--active': i === active, '--past': i < active }">
+          <button :aria-pressed="i === active" @click="selectChapter(i)">
           <span class="en-display featured__no">Chapter {{ c.no }}</span>
           <span class="en-display featured__title">{{ c.title }}</span>
           <span class="featured__q body-m">{{ c.q }}</span>
+          </button>
         </li>
       </ol>
+      <p class="featured__touch-note body-m" role="status">{{ featured.chapters[active]!.q }}<br><small>챕터를 눌러 단지의 모습을 바꿔보세요.</small></p>
     </div>
   </section>
 </template>
@@ -112,16 +124,14 @@ onBeforeUnmount(() => ctx?.revert())
   flex-direction: column;
   gap: 6px;
 }
+.featured__touch-note { display: none; }
 .featured__chapters li {
-  display: grid;
-  grid-template-columns: 7.2em 1fr;
-  gap: 2px 12px;
-  padding: 10px 14px;
   border: 2px solid transparent;
   border-radius: 14px;
   opacity: 0.4;
   transition: opacity 0.3s, background-color 0.3s, border-color 0.3s, transform 0.3s;
 }
+.featured__chapters button { display: grid; grid-template-columns: 7.2em 1fr; gap: 2px 12px; padding: 10px 14px; width: 100%; min-height: 48px; text-align: left; border-radius: 12px; }
 .featured__chapters li.--past {
   opacity: 0.7;
 }
@@ -155,6 +165,8 @@ onBeforeUnmount(() => ctx?.revert())
   }
   .featured__left {
     gap: 12px;
+    position: relative;
+    z-index: 41;
   }
   .featured__left h2 {
     font-size: clamp(34px, 9vw, 56px);
@@ -165,9 +177,25 @@ onBeforeUnmount(() => ctx?.revert())
     width: auto;
     height: clamp(120px, 22svh, 220px);
   }
-  .featured__chapters li {
+  .featured__chapters button {
     grid-template-columns: 6.5em 1fr;
     padding: 5px 10px;
   }
+}
+@media (pointer: coarse), (max-width: 1000px), (max-height: 700px), (prefers-reduced-motion: reduce) {
+  .featured__pin { height: auto; min-height: 100svh; padding-block: 80px; overflow: visible; }
+  .featured__chapters li { opacity: .7; }
+  .featured__chapters li.--active { opacity: 1; }
+  .featured__jar { height: 220px; max-width: 70vw; }
+}
+@media (pointer: coarse), (max-width: 1000px) {
+  .featured__chapters { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; width: 100%; }
+  .featured__chapters button { grid-template-columns: 1fr; gap: 7px; padding: 10px 8px; min-height: 70px; }
+  .featured__no { font-size: 10px; }
+  .featured__title { font-size: 17px; }
+  .featured__q { display: none !important; }
+  .featured__chapters li.--active { transform: none; }
+  .featured__touch-note { display: block; min-height: 64px; }
+  .featured__touch-note small { font-size: 12px; opacity: .75; }
 }
 </style>

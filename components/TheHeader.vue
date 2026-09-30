@@ -3,11 +3,27 @@ import { brand, nav } from '~/data/content'
 
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 
-const { scrollTo } = useSmoothScroll()
+const { scrollTo, stop, start } = useSmoothScroll()
 const { blip } = useSound()
 const menuOpen = ref(false)
 const hidden = ref(false)
 let st: ScrollTrigger | undefined
+const header = ref<HTMLElement>()
+const burger = ref<HTMLButtonElement>()
+watch(menuOpen, async (open: boolean) => {
+  if (open) { hidden.value = false; stop(); await nextTick(); header.value?.querySelector<HTMLAnchorElement>('.header__mobile a')?.focus() }
+  else { start(); burger.value?.focus({ preventScroll: true }) }
+})
+function onKey(event: KeyboardEvent) {
+  if (!menuOpen.value) return
+  if (event.key === 'Escape') { event.preventDefault(); menuOpen.value = false }
+  if (event.key === 'Tab') {
+    const nodes = Array.from((header.value as HTMLElement).querySelectorAll<HTMLElement>('a,button')).filter(e => e.getClientRects().length)
+    const first = nodes[0]!, last = nodes[nodes.length - 1]!
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus() }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() }
+  }
+}
 
 // 내려갈 때 숨고, 올라갈 때 다시 등장
 onMounted(() => {
@@ -23,15 +39,16 @@ onBeforeUnmount(() => st?.kill())
 const left = nav.slice(0, 3)
 const right = nav.slice(3)
 
-function go(href: string) {
+async function go(href: string) {
   blip(1.2)
   menuOpen.value = false
+  await nextTick()
   scrollTo(href)
 }
 </script>
 
 <template>
-  <header class="header" :class="{ '--hidden': hidden }">
+  <header ref="header" class="header" :class="{ '--hidden': hidden }" @keydown="onKey">
     <div class="header__bar container">
       <nav class="header__side --start" aria-label="주요 메뉴">
         <a v-for="l in left" :key="l.href" :href="l.href" class="header__link" @click.prevent="go(l.href)">{{ l.label }}</a>
@@ -40,14 +57,14 @@ function go(href: string) {
       <nav class="header__side --end" aria-label="보조 메뉴">
         <a v-for="l in right" :key="l.href" :href="l.href" class="header__link" @click.prevent="go(l.href)">{{ l.label }}</a>
         <SoundSwitcher />
-        <button class="header__burger btn btn--sm" :aria-expanded="menuOpen" aria-label="메뉴" @click="menuOpen = !menuOpen">
+        <button ref="burger" class="header__burger btn btn--sm" :aria-expanded="menuOpen" aria-controls="mobile-menu" aria-label="메뉴" @click="menuOpen = !menuOpen">
           {{ menuOpen ? '닫기' : '메뉴' }}
         </button>
       </nav>
     </div>
 
     <Transition name="drop">
-      <nav v-if="menuOpen" class="header__mobile" aria-label="모바일 메뉴">
+      <nav v-if="menuOpen" id="mobile-menu" class="header__mobile" aria-label="모바일 메뉴">
         <a v-for="l in nav" :key="l.href" :href="l.href" class="en-display size-lg sticker-text" @click.prevent="go(l.href)">{{ l.label }}</a>
       </nav>
     </Transition>
@@ -102,6 +119,8 @@ function go(href: string) {
 }
 .header__link:hover {
   background: var(--banana);
+  height: 100dvh;
+  overflow-y: auto;
   transform: translateY(-2px);
 }
 .header__logo {

@@ -8,10 +8,13 @@ import { EXRLoader } from 'three/examples/jsm/loaders/EXRLoader.js'
 import { products, type ProductKey } from '~/data/content'
 
 // 단순화한 오리지널 3D 형태(로고·실제 패키지 없음). Rotate / Zoom / Explode / Detail 모드 지원.
-export type Mode = 'rotate' | 'zoom' | 'explode' | 'detail'
+export type Mode = 'rotate' | 'zoom' | 'explode' | 'detail' | 'play'
 
-const props = defineProps<{ product: ProductKey; mode: Mode }>()
+const props = defineProps<{ product: ProductKey; mode: Mode; gesture?: number; side?: string }>()
+const emit = defineEmits<{ 'update:gesture': [value: number] }>()
 const host = ref<HTMLDivElement>()
+const available = ref(true)
+let disposed = false
 
 let renderer: THREE.WebGLRenderer | undefined
 let raf = 0
@@ -177,9 +180,11 @@ function buildBravo(): Built {
 // 블렌더에서 베이킹한 실사 재질(PBR)을 그대로 쓰고, 크기·중심만 맞춘다.
 // 분해 방향은 Blender 커스텀 속성 "explode"(glTF extras)를 우선 사용한다.
 // 눕혀서 모델링한 제품은 카메라 쪽으로 기울여 보여준다
-const viewTilt: Partial<Record<ProductKey, number>> = { samanco: 0.95 }
+const viewTilt: Partial<Record<ProductKey, number>> = {}
 
 function fromGLB(root: THREE.Object3D, key: ProductKey): Built {
+  prepareSleeve(root)
+  finishProduct(root)
   root.traverse((o) => {
     const m = o as THREE.Mesh
     if (!m.isMesh) return
@@ -201,13 +206,7 @@ function fromGLB(root: THREE.Object3D, key: ProductKey): Built {
   inner.rotation.x = viewTilt[key] ?? 0
   const group = new THREE.Group()
   group.add(inner)
-  const parts: Part[] = root.children.map((child) => {
-    const e = child.userData.explode as number[] | undefined
-    if (Array.isArray(e) && e.length === 3) return { obj: child, explode: new THREE.Vector3(e[0], e[1], e[2]) }
-    const dir = new THREE.Box3().setFromObject(child).getCenter(new THREE.Vector3()).sub(center)
-    if (dir.lengthSq() < 1e-4) return { obj: child, explode: new THREE.Vector3() }
-    return { obj: child, explode: dir.normalize().multiplyScalar(0.9) }
-  })
+  const parts: Part[] = productParts(root)
   return { group, parts }
 }
 
@@ -224,8 +223,12 @@ onMounted(() => {
   const camera = new THREE.PerspectiveCamera(32, 1, 0.1, 100)
   camera.position.set(0, 0.5, 9.5)
 
-  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75))
+  try { renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true }) }
+  catch { available.value = false; return }
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  const mobile = window.matchMedia('(pointer: coarse)').matches || window.innerWidth <= 800
+  const continuous = !mobile && !reduced
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, mobile ? 1 : 1.75))
   renderer.outputColorSpace = THREE.SRGBColorSpace
   // 블렌더 렌더(Khronos PBR Neutral)와 같은 톤으로
   renderer.toneMapping = THREE.NeutralToneMapping
@@ -267,8 +270,10 @@ onMounted(() => {
 
   const built = {} as Record<ProductKey, Built>
   const origins = new Map<THREE.Object3D, THREE.Vector3>()
+  const rotations = new Map<THREE.Object3D, THREE.Euler>()
   const register = (k: ProductKey, b: Built) => {
-    b.parts.forEach((p) => origins.set(p.obj, p.obj.position.clone()))
+    b.parts.forEach((p) => { origins.set(p.obj, p.obj.position.clone()); rotations.set(p.obj, p.obj.rotation.clone()) })
+    b.group.traverse(o=>{if(o.name==='Sleeve_Assembly'){origins.set(o,o.position.clone());rotations.set(o,o.rotation.clone())}})
     b.group.visible = false
     b.group.scale.setScalar(0.0001)
     pivot.add(b.group)
@@ -281,6 +286,7 @@ onMounted(() => {
   const envLoading = new Set<ProductKey>()
   const exr = new EXRLoader()
   const applyEnv = (k: ProductKey) => {
+    if (mobile) return
     const info = products.find((p) => p.key === k)!
     const cached = envCache.get(k)
     if (cached) {
@@ -293,6 +299,7 @@ onMounted(() => {
     exr.load(
       info.env,
       (tex) => {
+        if (disposed) { tex.dispose(); return }
         const pm = track(pmrem.fromEquirectangular(tex).texture)
         tex.dispose()
         envCache.set(k, pm)
@@ -321,6 +328,7 @@ onMounted(() => {
       loader.load(
         p.model,
         (gltf) => {
+          if (disposed) return
           // glTF 기본 자세는 조립 전(첫 프레임)이라 마지막 프레임(완성)으로 맞춘다
           if (gltf.animations.length) {
             const mx = new THREE.AnimationMixer(gltf.scene)
@@ -337,6 +345,7 @@ onMounted(() => {
           const old = built[p.key]
           pivot.remove(old.group)
           register(p.key, fromGLB(gltf.scene, p.key))
+          el.dataset.model = p.key
           if (current === p.key) {
             current = null
             showProduct(p.key)
@@ -352,15 +361,19 @@ onMounted(() => {
 
   let current: ProductKey | null = null
   function showProduct(k: ProductKey) {
+    if (disposed || current === k) return
     if (current) {
       const prev = built[current].group
+      gsap.killTweensOf(prev.scale)
       gsap.to(prev.scale, { x: 0.0001, y: 0.0001, z: 0.0001, duration: 0.3, ease: 'back.in(2)', onComplete: () => { prev.visible = false } })
     }
     current = k
     const g = built[k].group
+    gsap.killTweensOf(g.scale)
+    gsap.killTweensOf(pivot.rotation)
     g.visible = true
     gsap.to(g.scale, { x: 1, y: 1, z: 1, duration: 0.7, delay: 0.2, ease: 'back.out(1.8)' })
-    gsap.fromTo(pivot.rotation, { y: pivot.rotation.y - Math.PI }, { y: pivot.rotation.y, duration: 0.9, ease: 'power3.out' })
+    if (!reduced && props.mode !== 'play') gsap.fromTo(pivot.rotation, { y: pivot.rotation.y - Math.PI }, { y: pivot.rotation.y, duration: 0.9, ease: 'power3.out' })
     applyMode(props.mode)
     if (modelsRequested) applyEnv(k)
     kickLoop?.()
@@ -372,13 +385,36 @@ onMounted(() => {
     built[current].parts.forEach((p) => {
       const o = origins.get(p.obj)!
       const t = exploded ? o.clone().add(p.explode) : o
+      gsap.killTweensOf(p.obj.position)
       gsap.to(p.obj.position, { x: t.x, y: t.y, z: t.z, duration: 0.8, ease: exploded ? 'back.out(1.6)' : 'power3.inOut' })
     })
+    applyGesture()
     kickLoop?.()
-    const dist = mode === 'zoom' ? 5.4 : mode === 'detail' ? 6.6 : mode === 'explode' ? 11 : 9.5
-    gsap.to(camera.position, { z: dist, duration: 0.9, ease: 'power3.inOut' })
+    const dist = mode === 'zoom' ? 5.4 : mode === 'detail' ? 6.6 : mode === 'explode' ? 8 : mode === 'play' ? 7.2 : 8
+    gsap.to(camera.position, { z: dist, duration: reduced ? 0 : 0.9, ease: 'power3.inOut', overwrite: true })
   }
 
+  function applyGesture() {
+    if(!current)return
+    const b=built[current],t=THREE.MathUtils.clamp((props.gesture??0)/100,0,1)
+    const sleeve=b.group.getObjectByName('Sleeve_Assembly')
+    if(sleeve&&origins.has(sleeve))sleeve.position.copy(origins.get(sleeve)!)
+    b.parts.forEach(p=>p.obj.rotation.copy(rotations.get(p.obj)!))
+    if(props.mode!=='play')return
+    gsap.killTweensOf(pivot.rotation)
+    pivot.rotation.set(.08,0,0)
+    for(const p of b.parts){gsap.killTweensOf(p.obj.position);p.obj.position.copy(origins.get(p.obj)!)}
+    if(current==='bananaMilk')pivot.rotation.y=Math.PI*t
+    if(current==='yoplait'){
+      const lid=b.group.getObjectByName('Foil_Lid');if(lid){lid.position.y+=.5*t;lid.rotation.x=-1.05*t}
+    }
+    if(current==='samanco'){
+      const wafer=b.group.getObjectByName('Wafer_Front');if(wafer){wafer.position.z+=.5*t;wafer.position.x+=(props.side==='tail'?1:-1)*.35*t;wafer.rotation.y=(props.side==='tail'?-1:1)*.8*t}
+    }
+    if(current==='bravo'&&sleeve)sleeve.position.y-=.75*t
+    el.dataset.gesture=String(Math.round(t*100));kickLoop?.()
+  }
+  watch([()=>props.gesture,()=>props.side],applyGesture)
   showProduct(props.product)
   watch(() => props.product, (k: ProductKey) => showProduct(k))
   watch(() => props.mode, (m: Mode) => applyMode(m))
@@ -389,20 +425,28 @@ onMounted(() => {
   let lastY = 0
   let velY = 0
   const down = (e: PointerEvent) => {
+    if((e.target as HTMLElement).closest('button,input'))return
+    if (e.pointerType === 'mouse' && e.button !== 0) return
     dragging = true
+    gsap.killTweensOf(pivot.rotation)
+    velY = 0
     lastX = e.clientX
     lastY = e.clientY
     el.setPointerCapture(e.pointerId)
+    kickLoop?.()
   }
   const move = (e: PointerEvent) => {
     if (!dragging) return
+    if (e.cancelable) e.preventDefault()
+    if(props.mode==='play'){emit('update:gesture',THREE.MathUtils.clamp((props.gesture??0)+(props.product==='bananaMilk'?e.clientX-lastX:lastY-e.clientY)*.6,0,100));lastX=e.clientX;lastY=e.clientY;return}
     velY = (e.clientX - lastX) * 0.01
     pivot.rotation.y += velY
     pivot.rotation.x = THREE.MathUtils.clamp(pivot.rotation.x + (e.clientY - lastY) * 0.006, -0.6, 0.6)
     lastX = e.clientX
     lastY = e.clientY
+    kickLoop?.()
   }
-  const up = () => (dragging = false)
+  const up = () => { dragging = false; if (mobile) velY = 0; kickLoop?.() }
   el.addEventListener('pointerdown', down)
   el.addEventListener('pointermove', move)
   el.addEventListener('pointerup', up)
@@ -418,6 +462,7 @@ onMounted(() => {
     renderer!.setSize(el.clientWidth, el.clientHeight)
     camera.aspect = el.clientWidth / el.clientHeight
     camera.updateProjectionMatrix()
+    kickLoop?.()
   }
   ro = new ResizeObserver(resize)
   ro.observe(el)
@@ -425,7 +470,11 @@ onMounted(() => {
 
   const clock = new THREE.Clock()
   let visible = false
+  let renderUntil = 0
+  let renderCount = 0
   const kick = () => {
+    if (disposed) return
+    renderUntil = performance.now() + 1500
     cancelAnimationFrame(raf)
     tick()
   }
@@ -439,20 +488,30 @@ onMounted(() => {
   io.observe(el)
 
   const tick = () => {
+    if (disposed) return
+    const dt = Math.min(clock.getDelta(), .05)
     const t = clock.getElapsedTime()
-    if (!dragging) {
-      velY *= 0.94
-      pivot.rotation.y += props.mode === 'rotate' ? 0.012 + velY : velY
+    if (!dragging && props.mode!=='play') {
+      velY *= Math.pow(0.94, dt * 60)
+      pivot.rotation.y += (props.mode === 'rotate' && continuous ? .72 * dt : 0) + velY
     }
-    pivot.position.y = Math.sin(t * 1.4) * 0.08
+    pivot.position.y = !continuous || props.mode === 'play' ? 0 : Math.sin(t * 1.4) * 0.08
     camera.lookAt(0, 0, 0)
     renderer!.render(scene, camera)
-    if (visible) raf = requestAnimationFrame(tick)
+    el.dataset.frames = String(++renderCount)
+    el.dataset.rotation = `${pivot.rotation.x.toFixed(3)},${pivot.rotation.y.toFixed(3)}`
+    if (visible && (continuous || dragging || performance.now() < renderUntil)) raf = requestAnimationFrame(tick)
   }
   tick()
+  cleanups.push(() => {
+    kickLoop = undefined
+    gsap.killTweensOf([pivot.rotation, camera.position])
+    Object.values(built).forEach(b => { gsap.killTweensOf(b.group.scale); b.parts.forEach(p => gsap.killTweensOf(p.obj.position)) })
+  })
 })
 
 onBeforeUnmount(() => {
+  disposed = true
   cancelAnimationFrame(raf)
   cleanups.forEach((f) => f())
   ro?.disconnect()
@@ -464,17 +523,22 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div ref="host" class="product-scene" data-cursor="DRAG" />
+  <div ref="host" class="product-scene" data-cursor="DRAG" data-lenis-prevent-touch style="touch-action: none">
+    <div v-if="!available" class="product-scene__fallback"><ProductArt :product="product" /><p>이 환경에서는 제품 이미지로 보여드려요.</p></div>
+  </div>
 </template>
 
 <style scoped>
 .product-scene {
   position: absolute;
   inset: 0;
-  touch-action: pan-y;
+  touch-action: none;
   cursor: grab;
-  touch-action: pan-y;
+  touch-action: none;
 }
+.product-scene__fallback { height: 100%; display: grid; place-items: center; padding: 40px 50px 76px; }
+.product-scene__fallback .product-art { height: 85%; width: 100%; }
+.product-scene__fallback p { font-size: 12px; text-align: center; }
 .product-scene:active {
   cursor: grabbing;
 }

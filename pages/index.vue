@@ -2,30 +2,42 @@
 import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 
+const entered = useState('entered-site', () => false)
 const started = ref(false)
-const { init, stop, start } = useSmoothScroll()
+const { init, stop, start, destroy, scrollTo } = useSmoothScroll()
 const { bg, ink } = usePageColor()
+let ctx: gsap.Context | undefined
+let disposed = false
 
 onMounted(async () => {
   init()
-  stop()
+  started.value = entered.value
+  if (!started.value) stop()
 
   // 섹션 제목류는 화면에 들어올 때 톡 튀어나오게
+  ctx = gsap.context(() => {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
   gsap.set('.section-head > *', { opacity: 0, y: 40 })
   ScrollTrigger.batch('.section-head > *', {
     start: 'top 88%',
     once: true,
     onEnter: (batch) => gsap.to(batch, { opacity: 1, y: 0, stagger: 0.08, duration: 0.7, ease: 'back.out(1.7)' }),
   })
+  })
 
   // 폰트가 로드되면 글자 폭이 달라지므로 위치 재계산
   await document.fonts.ready
+  if (disposed) return
   ScrollTrigger.refresh()
+  if (started.value && location.hash) scrollTo(location.hash)
 })
+onBeforeUnmount(() => { disposed = true; ctx?.revert(); destroy() })
 
 function onStart() {
   started.value = true
+  entered.value = true
   start()
+  if (location.hash) scrollTo(location.hash)
 }
 </script>
 
@@ -37,6 +49,7 @@ function onStart() {
       <TheStage />
     </ClientOnly>
     <ThePreloader v-if="!started" @start="onStart" />
+    <div :inert="!started">
     <TheCursor />
     <TheHeader />
     <SectionHero :started="started" />
@@ -50,6 +63,7 @@ function onStart() {
     <SectionYourMoment />
     <SectionNews />
     <TheFooter />
+    </div>
   </main>
 </template>
 

@@ -43,3 +43,17 @@ docker compose up -d --build   # http://localhost:3300
 ## Stack
 
 Nuxt 3 · Three.js · GSAP (ScrollTrigger) · Lenis
+
+### Labelled Blender model integration
+
+The shared stage and product inspector now use the concept GLBs in `public/models/teum/`. Editable Blender sources are in the sibling `binggrae-teum/three/` project. The original models remain in place. Product fallback images are in `public/products/teum/`.
+
+`productParts()` maps the named lid, front wafer and ice-cream groups to their separation offsets, preserving attached label meshes. Samanco uses its native upright orientation. The hero message has opaque cream panels and an earlier reveal for readability. Reverse labels and internal layers are original concept designs.
+
+Validation: Nuxt typecheck and production build; local Chrome desktop/mobile start flow, shared 3D stage, four product selections and separation controls. The existing optional font-format warnings remain in the production build.
+
+### Product play and archive pass
+
+LOOK CLOSER includes product-specific progress controls: opening the Yoplait foil, choosing the Samanco wafer opening direction, sliding the Bravo sleeve, and finding the banana milk reverse label. The progress slider is keyboard-accessible; dragging in play mode adjusts the same progress. `useProductFinish.ts` supplies fine wafer bump variation and material roughness adjustments. The shared stage gives each product a different entrance and settles near the front label.
+
+The last product chosen in LOOK CLOSER is available in the personal card form. Product and card color can be changed explicitly; PNG export includes both. Cards stay in browser local storage. `/brandbook` contains six scroll-linked editorial scenes, with official 2024 package/book images and direct source links. See `SOURCES.md` for provenance.

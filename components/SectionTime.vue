@@ -42,7 +42,7 @@ onMounted(() => {
         </div>
         <span class="time__arrow en-display" aria-hidden="true">{{ i < timeline.steps.length - 1 ? '→' : '' }}</span>
         <h3 class="ko-display size-md">{{ s.title }}</h3>
-        <p class="body-m">{{ s.note }}</p>
+        <p class="body-m">{{ s.note }}</p><a :href="s.source" target="_blank" rel="noopener" class="time__source">자료: 빙그레 공식 기록 ↗</a>
       </article>
     </div>
 
@@ -51,6 +51,7 @@ onMounted(() => {
 </template>
 
 <style scoped>
+.time__source{font-size:12px;text-decoration:underline;display:inline-block;margin-top:12px}
 .time__list {
   position: relative;
   display: grid;
@@ -114,7 +115,8 @@ onMounted(() => {
   margin-top: clamp(32px, 6vh, 64px);
 }
 @media (max-width: 900px) {
-  .time__list {
+  .time__source{font-size:12px;text-decoration:underline;display:inline-block;margin-top:12px}
+.time__list {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .time__line,

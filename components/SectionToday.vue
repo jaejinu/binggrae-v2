@@ -4,8 +4,12 @@ import { today } from '~/data/content'
 
 // 08. BINGGRAE TODAY — 현재 브랜드 활동
 const root = ref<HTMLElement>()
+let ctx: gsap.Context | undefined
+onBeforeUnmount(() => ctx?.revert())
 useSectionColor(root, () => ({ bg: '#8fd3ff' }))
 onMounted(() => {
+  ctx = gsap.context(() => {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
   gsap.from(root.value!.querySelectorAll('.today__card'), {
     y: 100,
     rotate: (i: number) => [-5, 4, -3, 5, -4][i % 5],
@@ -15,6 +19,7 @@ onMounted(() => {
     ease: 'back.out(1.5)',
     scrollTrigger: { trigger: root.value!.querySelector('.today__cards'), start: 'top 80%' },
   })
+  }, root.value)
 })
 </script>
 
