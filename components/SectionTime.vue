@@ -4,6 +4,7 @@ import { timeline } from '~/data/content'
 
 // 05. LONG LIFE ICONS — 과거 패키지 → 광고 → 사진 → 현재 제품
 const root = ref<HTMLElement>()
+useSectionColor(root, () => ({ bg: '#fff6e0' }))
 
 onMounted(() => {
   gsap.from(root.value!.querySelectorAll('.time__item'), {
@@ -36,7 +37,7 @@ onMounted(() => {
       <span class="time__line" aria-hidden="true" />
       <article v-for="(s, i) in timeline.steps" :key="s.label" class="time__item">
         <div class="time__frame card" :style="{ background: s.color }">
-          <span class="time__placeholder body-m">이미지 · 아카이브 자료 자리</span>
+          <MediaSlot :src="s.image" :alt="s.title" label="이미지 · 아카이브 자료 자리" />
           <span class="time__badge en-display">{{ s.label }}</span>
         </div>
         <span class="time__arrow en-display" aria-hidden="true">{{ i < timeline.steps.length - 1 ? '→' : '' }}</span>
@@ -50,9 +51,6 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.time {
-  background: var(--cream);
-}
 .time__list {
   position: relative;
   display: grid;
@@ -78,6 +76,7 @@ onMounted(() => {
 }
 .time__frame {
   position: relative;
+  overflow: hidden;
   display: grid;
   place-items: center;
   aspect-ratio: 4 / 5;

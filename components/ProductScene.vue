@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import * as THREE from 'three'
 import gsap from 'gsap'
-import type { ProductKey } from '~/data/content'
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import { products, type ProductKey } from '~/data/content'
 
 // 단순화한 오리지널 3D 형태(로고·실제 패키지 없음). Rotate / Zoom / Explode / Detail 모드 지원.
 export type Mode = 'rotate' | 'zoom' | 'explode' | 'detail'
@@ -12,6 +13,7 @@ const host = ref<HTMLDivElement>()
 let renderer: THREE.WebGLRenderer | undefined
 let raf = 0
 let ro: ResizeObserver | undefined
+let io: IntersectionObserver | undefined
 const cleanups: (() => void)[] = []
 const disposables: { dispose(): void }[] = []
 const track = <T extends { dispose(): void }>(d: T) => (disposables.push(d), d)
@@ -167,6 +169,28 @@ function buildBravo(): Built {
   }
 }
 
+// public/models/*.glb 가 있으면 그 모델을 사용. 크기·중심을 맞추고, 최상위 자식들을 분해 파트로 사용.
+function fromGLB(root: THREE.Object3D): Built {
+  const box = new THREE.Box3().setFromObject(root)
+  const size = box.getSize(new THREE.Vector3())
+  const center = box.getCenter(new THREE.Vector3())
+  const scale = 2.8 / Math.max(size.x, size.y, size.z)
+  root.position.sub(center)
+  const inner = new THREE.Group()
+  inner.add(root)
+  inner.scale.setScalar(scale)
+  const group = new THREE.Group()
+  group.add(inner)
+  const children = root.children.length > 1 ? root.children : root.children[0]?.children ?? []
+  const parts: Part[] = children.map((child, i) => {
+    const c = new THREE.Box3().setFromObject(child).getCenter(new THREE.Vector3())
+    const dir = c.sub(center)
+    if (dir.lengthSq() < 1e-6) dir.set(0, 1, 0).applyAxisAngle(new THREE.Vector3(0, 0, 1), i * 0.9)
+    return { obj: child, explode: dir.normalize().multiplyScalar(0.9 / scale) }
+  })
+  return { group, parts }
+}
+
 const builders: Record<ProductKey, () => Built> = {
   bananaMilk: buildBananaMilk,
   yoplait: buildYoplait,
@@ -181,7 +205,7 @@ onMounted(() => {
   camera.position.set(0, 0.5, 9.5)
 
   renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75))
   renderer.outputColorSpace = THREE.SRGBColorSpace
   el.appendChild(renderer.domElement)
 
@@ -195,13 +219,33 @@ onMounted(() => {
 
   const built = {} as Record<ProductKey, Built>
   const origins = new Map<THREE.Object3D, THREE.Vector3>()
-  ;(Object.keys(builders) as ProductKey[]).forEach((k) => {
-    const b = builders[k]()
+  const register = (k: ProductKey, b: Built) => {
     b.parts.forEach((p) => origins.set(p.obj, p.obj.position.clone()))
     b.group.visible = false
     b.group.scale.setScalar(0.0001)
     pivot.add(b.group)
     built[k] = b
+  }
+  ;(Object.keys(builders) as ProductKey[]).forEach((k) => register(k, builders[k]()))
+
+  const loader = new GLTFLoader()
+  products.forEach((p) => {
+    loader.load(
+      p.model,
+      (gltf) => {
+        const old = built[p.key]
+        pivot.remove(old.group)
+        register(p.key, fromGLB(gltf.scene))
+        if (current === p.key) {
+          current = null
+          showProduct(p.key)
+        }
+      },
+      undefined,
+      () => {
+        /* 모델 파일이 없으면 기본 3D 유지 */
+      },
+    )
   })
 
   let current: ProductKey | null = null
@@ -275,6 +319,17 @@ onMounted(() => {
   resize()
 
   const clock = new THREE.Clock()
+  let visible = false
+  io = new IntersectionObserver(([entry]) => {
+    const was = visible
+    visible = entry.isIntersecting
+    if (visible && !was) {
+      cancelAnimationFrame(raf)
+      tick()
+    }
+  })
+  io.observe(el)
+
   const tick = () => {
     const t = clock.getElapsedTime()
     if (!dragging) {
@@ -284,7 +339,7 @@ onMounted(() => {
     pivot.position.y = Math.sin(t * 1.4) * 0.08
     camera.lookAt(0, 0, 0)
     renderer!.render(scene, camera)
-    raf = requestAnimationFrame(tick)
+    if (visible) raf = requestAnimationFrame(tick)
   }
   tick()
 })
@@ -293,6 +348,7 @@ onBeforeUnmount(() => {
   cancelAnimationFrame(raf)
   cleanups.forEach((f) => f())
   ro?.disconnect()
+  io?.disconnect()
   disposables.forEach((d) => d.dispose())
   renderer?.dispose()
   renderer?.domElement.remove()
@@ -300,13 +356,14 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div ref="host" class="product-scene" />
+  <div ref="host" class="product-scene" data-cursor="DRAG" />
 </template>
 
 <style scoped>
 .product-scene {
   position: absolute;
   inset: 0;
+  touch-action: pan-y;
   cursor: grab;
   touch-action: pan-y;
 }

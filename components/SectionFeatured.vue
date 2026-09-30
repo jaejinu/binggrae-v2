@@ -4,6 +4,7 @@ import { featured } from '~/data/content'
 
 // 07. 단지, 50년의 이야기 — 스크롤 기반 Digital Brand Book 미리보기
 const root = ref<HTMLElement>()
+useSectionColor(root, () => ({ bg: '#ffd43b' }))
 const pin = ref<HTMLElement>()
 const active = ref(0)
 let ctx: gsap.Context | undefined
@@ -60,9 +61,6 @@ onBeforeUnmount(() => ctx?.revert())
 </template>
 
 <style scoped>
-.featured {
-  background: var(--banana);
-}
 .featured__pin {
   position: relative;
   height: 100vh;

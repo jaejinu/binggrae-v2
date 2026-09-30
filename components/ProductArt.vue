@@ -1,12 +1,16 @@
 <script setup lang="ts">
-import type { ProductKey } from '~/data/content'
+import { products, type ProductKey } from '~/data/content'
 
-// Simplified, original sticker drawings of each product's silhouette (no logos or real packaging).
-defineProps<{ product: ProductKey }>()
+// 기본값은 형태만 단순화한 오리지널 스티커 일러스트(로고·실제 패키지 없음).
+// public/products/ 에 이미지를 넣으면 자동으로 그 이미지로 교체된다.
+const props = defineProps<{ product: ProductKey }>()
+const info = computed(() => products.find((p) => p.key === props.product)!)
+const hasImage = useImageAvailable(() => info.value.image)
 </script>
 
 <template>
-  <svg class="product-art" viewBox="0 0 300 360" aria-hidden="true">
+  <img v-if="hasImage" :src="info.image" :alt="info.nameKo" class="product-art product-art--img" draggable="false" />
+  <svg v-else class="product-art" viewBox="0 0 300 360" aria-hidden="true">
     <g stroke="#1a1a1a" stroke-width="5" stroke-linejoin="round" stroke-linecap="round">
       <!-- 단지 모양 우유 -->
       <g v-if="product === 'bananaMilk'">
@@ -60,5 +64,9 @@ defineProps<{ product: ProductKey }>()
   width: 100%;
   height: 100%;
   overflow: visible;
+}
+.product-art--img {
+  object-fit: contain;
+  filter: drop-shadow(6px 6px 0 #1a1a1a);
 }
 </style>

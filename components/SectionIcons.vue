@@ -62,6 +62,8 @@ onMounted(() => {
   }, root.value)
 })
 
+useSectionColor(root, () => ({ bg: list[active.value].bg, ink: list[active.value].ink }), () => root.value?.parentElement)
+
 onBeforeUnmount(() => ctx?.revert())
 </script>
 
@@ -81,7 +83,7 @@ onBeforeUnmount(() => ctx?.revert())
         <svg class="icon-panel__shape" viewBox="0 0 200 200" aria-hidden="true">
           <path :d="shapes[p.key]" :fill="p.accent" stroke="#1a1a1a" stroke-width="2" opacity=".9" />
         </svg>
-        <div class="icon-panel__art">
+        <div class="icon-panel__art" data-cursor="ICON">
           <ProductArt :product="p.key" />
         </div>
         <div class="icon-panel__text">

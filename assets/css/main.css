@@ -22,7 +22,7 @@
 }
 
 html {
-  background: var(--cream);
+  background: var(--banana);
   color: var(--ink);
   font-family: var(--font-body);
   word-break: keep-all;
@@ -34,6 +34,9 @@ html.lenis body {
 }
 .lenis.lenis-smooth {
   scroll-behavior: auto !important;
+}
+.lenis.lenis-stopped {
+  overflow: hidden;
 }
 body {
   margin: 0;
@@ -133,6 +136,7 @@ button {
   font-weight: 700;
   font-size: 15px;
   box-shadow: 3px 3px 0 var(--ink);
+  translate: var(--mx, 0px) var(--my, 0px);
   transition: transform 0.15s, box-shadow 0.15s, background-color 0.2s;
 }
 .btn:hover {

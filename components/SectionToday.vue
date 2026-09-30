@@ -4,6 +4,7 @@ import { today } from '~/data/content'
 
 // 08. BINGGRAE TODAY — 현재 브랜드 활동
 const root = ref<HTMLElement>()
+useSectionColor(root, () => ({ bg: '#8fd3ff' }))
 onMounted(() => {
   gsap.from(root.value!.querySelectorAll('.today__card'), {
     y: 100,
@@ -31,10 +32,10 @@ onMounted(() => {
         <h2 class="ko-display size-xl sticker-text">{{ today.title }}</h2>
       </div>
       <div class="today__cards">
-        <a v-for="(item, i) in today.items" :key="item.tag" href="#" class="today__card card" @click.prevent>
+        <a v-for="(item, i) in today.items" :key="item.tag" href="#" class="today__card card" data-cursor="VIEW" @click.prevent>
           <div class="today__thumb" :style="{ background: item.color }">
             <SparkleStar v-if="i % 2 === 0" class="today__spark" :size="26" />
-            <span class="body-m">이미지 자리</span>
+            <MediaSlot :src="item.image" :alt="item.title" />
           </div>
           <span class="kicker">{{ item.tag }}</span>
           <p class="body-m">{{ item.title }}</p>
@@ -46,7 +47,6 @@ onMounted(() => {
 
 <style scoped>
 .today {
-  background: var(--sky);
   overflow: hidden;
 }
 .today__marquee {
@@ -87,6 +87,7 @@ onMounted(() => {
   aspect-ratio: 1;
   border: 2px solid var(--ink);
   border-radius: 12px;
+  overflow: hidden;
 }
 .today__thumb .body-m {
   font-size: 12px;
@@ -94,6 +95,7 @@ onMounted(() => {
 }
 .today__spark {
   position: absolute;
+  z-index: 1;
   right: 8px;
   top: 8px;
 }

@@ -4,6 +4,7 @@ import { stories } from '~/data/content'
 
 // 06. BINGGRAE STORIES — Magazine / Editorial
 const root = ref<HTMLElement>()
+useSectionColor(root, () => ({ bg: '#fffdf6' }))
 onMounted(() => {
   gsap.from(root.value!.querySelectorAll('.story'), {
     y: 60,
@@ -25,8 +26,9 @@ onMounted(() => {
     </div>
 
     <div class="stories__grid">
-      <a v-for="(s, i) in stories" :key="s.tag" href="#" class="story" :class="`--s${i}`" @click.prevent>
+      <a v-for="(s, i) in stories" :key="s.tag" href="#" class="story" :class="`--s${i}`" data-cursor="READ" @click.prevent>
         <div class="story__cover" :style="{ background: s.color }">
+          <MediaSlot :src="s.image" :alt="s.title"><span /></MediaSlot>
           <span class="story__issue en-display">No.{{ String(i + 1).padStart(2, '0') }}</span>
           <span class="story__big en-display" aria-hidden="true">{{ s.tag }}</span>
         </div>
@@ -42,7 +44,6 @@ onMounted(() => {
 
 <style scoped>
 .stories {
-  background: #fffdf6;
   border-top: var(--stroke) solid var(--ink);
 }
 .stories__masthead {
@@ -124,9 +125,8 @@ onMounted(() => {
   .stories__grid {
     grid-template-columns: 1fr;
   }
-  .story,
-  .story.--s0 {
-    grid-column: auto;
+  .stories__grid > .story {
+    grid-column: 1 / -1;
     grid-row: auto;
   }
 }

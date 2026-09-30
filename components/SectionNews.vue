@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { news } from '~/data/content'
+
+const root = ref<HTMLElement>()
+useSectionColor(root, () => ({ bg: '#fff6e0' }))
 </script>
 
 <template>
-  <section id="news" class="news section container">
+  <section id="news" ref="root" class="news section container">
     <div class="section-head news__head">
       <span class="kicker">10 — News / Notice</span>
       <h2 class="en-display size-xl">News</h2>
@@ -22,9 +25,6 @@ import { news } from '~/data/content'
 </template>
 
 <style scoped>
-.news {
-  background: var(--cream);
-}
 .news__list {
   list-style: none;
   margin: 0;

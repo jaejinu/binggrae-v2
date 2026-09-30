@@ -6,6 +6,11 @@ import { products } from '~/data/content'
 const active = ref(0)
 const root = ref<HTMLElement>()
 const current = computed(() => products[active.value])
+const { blip } = useSound()
+
+useSectionColor(root, () => ({ bg: current.value.bg, ink: current.value.ink }))
+
+watch(active, (i: number) => blip(1 + i * 0.12))
 
 watch(active, async () => {
   await nextTick()
@@ -26,7 +31,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <section id="moments" ref="root" class="moments section container" :style="{ background: current.bg, color: current.ink }">
+  <section id="moments" ref="root" class="moments section container">
     <div class="section-head">
       <span class="kicker">02 — Your Binggrae Moment</span>
       <h2 class="ko-display size-xl sticker-text">하루의 순간으로<br />제품 발견하기</h2>
@@ -66,9 +71,6 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.moments {
-  transition: background-color 0.6s, color 0.6s;
-}
 .moments__grid {
   display: grid;
   grid-template-columns: 1.2fr 1fr;
@@ -92,14 +94,14 @@ onMounted(() => {
   border-top: var(--stroke) solid currentColor;
   text-align: left;
   opacity: 0.55;
-  transition: opacity 0.3s, transform 0.3s;
+  transition: opacity 0.3s, padding 0.35s cubic-bezier(0.3, 1.4, 0.6, 1);
 }
 li:last-child .moments__item {
   border-bottom: var(--stroke) solid currentColor;
 }
 .moments__item.--active {
   opacity: 1;
-  transform: translateX(12px);
+  padding-left: 14px;
 }
 .moments__time {
   font-size: 15px;

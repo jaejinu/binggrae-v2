@@ -9,6 +9,10 @@ const productKey = ref<ProductKey>('bananaMilk')
 const mode = ref<Mode>('rotate')
 const current = computed(() => products.find((p) => p.key === productKey.value)!)
 const root = ref<HTMLElement>()
+const { blip } = useSound()
+
+useSectionColor(root, () => ({ bg: current.value.bg, ink: current.value.ink }))
+watch([productKey, mode], () => blip(1.2))
 
 const modes: { key: Mode; label: string }[] = [
   { key: 'rotate', label: 'Rotate' },
@@ -25,7 +29,7 @@ watch(productKey, async () => {
 </script>
 
 <template>
-  <section id="look-closer" ref="root" class="look section container" :style="{ background: current.bg, color: current.ink }">
+  <section id="look-closer" ref="root" class="look section container">
     <div class="section-head">
       <span class="kicker">04 — Why We Remember</span>
       <h2 class="ko-display size-xl sticker-text">제품에는<br />기억될 이유가 있다</h2>
@@ -82,9 +86,6 @@ watch(productKey, async () => {
 </template>
 
 <style scoped>
-.look {
-  transition: background-color 0.6s, color 0.6s;
-}
 .look__tabs {
   display: flex;
   flex-wrap: wrap;

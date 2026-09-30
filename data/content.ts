@@ -17,6 +17,8 @@ export interface Product {
   answer: string
   details: string[]
   href: string // 팀원 상세페이지 경로
+  image: string // public/ 기준 제품 이미지 (없으면 기본 일러스트)
+  model: string // public/ 기준 GLB 3D 모델 (없으면 기본 3D)
 }
 
 export const brand = {
@@ -68,6 +70,8 @@ export const products: Product[] = [
     answer: '마시는 대신 떠먹는 방식. 한 숟갈씩 천천히 즐기게 되는 형태의 이유를 따라가 봅니다.',
     details: ['컵 모양의 용기', '벗겨내는 뚜껑', '작은 숟가락'],
     href: '/icons/yoplait',
+    image: '/products/yoplait.png',
+    model: '/models/yoplait.glb',
   },
   {
     key: 'bananaMilk',
@@ -84,6 +88,8 @@ export const products: Product[] = [
     answer: '둥근 몸통과 좁은 입구. 손에 쥐었을 때 떠오르는 그 형태의 이유를 따라가 봅니다.',
     details: ['둥근 몸통', '좁아지는 목', '은박 뚜껑'],
     href: '/icons/banana-milk',
+    image: '/products/banana-milk.png',
+    model: '/models/banana-milk.glb',
   },
   {
     key: 'bravo',
@@ -100,6 +106,8 @@ export const products: Product[] = [
     answer: '들고 걸으며 먹을 수 있는 형태. 콘과 아이스크림이 한 번에 완성되는 이유를 따라가 봅니다.',
     details: ['바삭한 콘', '감싸는 포장지', '토핑'],
     href: '/icons/bravo',
+    image: '/products/bravo.png',
+    model: '/models/bravo.glb',
   },
   {
     key: 'samanco',
@@ -116,6 +124,8 @@ export const products: Product[] = [
     answer: '겨울 길거리 간식이 차가운 아이스크림이 되기까지. 그 모양에 담긴 기억을 따라가 봅니다.',
     details: ['붕어 모양 과자', '가운데 아이스크림', '팥 필링'],
     href: '/icons/samanco',
+    image: '/products/samanco.png',
+    model: '/models/samanco.glb',
   },
 ]
 
@@ -127,20 +137,20 @@ export const timeline = {
   titleKo: '빙그레와 함께한 시간',
   intro: '연혁이 아니라, 제품을 통해 지나온 시간.',
   steps: [
-    { label: 'PACKAGE', title: '과거의 패키지', note: '[예시] 처음 우리 손에 들렸던 모습', color: '#ffd43b' },
-    { label: 'AD', title: '광고', note: '[예시] 우리가 기억하는 그 장면과 노래', color: '#ff9ebd' },
-    { label: 'PHOTO', title: '사진', note: '[예시] 누군가의 앨범 속 한 장면', color: '#7ed957' },
-    { label: 'NOW', title: '현재의 제품', note: '[예시] 지금 편의점 냉장고 속 모습', color: '#8fd3ff' },
+    { label: 'PACKAGE', title: '과거의 패키지', note: '[예시] 처음 우리 손에 들렸던 모습', image: '/images/time-package.jpg', color: '#ffd43b' },
+    { label: 'AD', title: '광고', note: '[예시] 우리가 기억하는 그 장면과 노래', image: '/images/time-ad.jpg', color: '#ff9ebd' },
+    { label: 'PHOTO', title: '사진', note: '[예시] 누군가의 앨범 속 한 장면', image: '/images/time-photo.jpg', color: '#7ed957' },
+    { label: 'NOW', title: '현재의 제품', note: '[예시] 지금 편의점 냉장고 속 모습', image: '/images/time-now.jpg', color: '#8fd3ff' },
   ],
   cta: { label: '브랜드 스토리 보기', href: '/story' },
 }
 
 export const stories = [
-  { tag: 'DESIGN', title: '왜 바나나맛우유는 단지 모양일까?', color: '#ffd43b' },
-  { tag: 'COLOR', title: '메로나의 초록색은 어떻게 하나의 맛이 되었을까?', color: '#7ed957' },
-  { tag: 'NAMING', title: '‘투게더’라는 이름은 어떻게 만들어졌을까?', color: '#8fd3ff' },
-  { tag: 'MEMORY', title: '50년 동안 바나나맛우유를 마신 사람들의 이야기', color: '#ff9ebd' },
-  { tag: 'CULTURE', title: '붕어빵은 어떻게 여름에 얼게 되었을까?', color: '#e8542f' },
+  { tag: 'DESIGN', title: '왜 바나나맛우유는 단지 모양일까?', image: '/images/story-design.jpg', color: '#ffd43b' },
+  { tag: 'COLOR', title: '메로나의 초록색은 어떻게 하나의 맛이 되었을까?', image: '/images/story-color.jpg', color: '#7ed957' },
+  { tag: 'NAMING', title: '‘투게더’라는 이름은 어떻게 만들어졌을까?', image: '/images/story-naming.jpg', color: '#8fd3ff' },
+  { tag: 'MEMORY', title: '50년 동안 바나나맛우유를 마신 사람들의 이야기', image: '/images/story-memory.jpg', color: '#ff9ebd' },
+  { tag: 'CULTURE', title: '붕어빵은 어떻게 여름에 얼게 되었을까?', image: '/images/story-culture.jpg', color: '#e8542f' },
 ]
 
 export const featured = {
@@ -161,11 +171,11 @@ export const featured = {
 export const today = {
   title: '빙그레는 오늘도 새로운 틈을 만듭니다.',
   items: [
-    { tag: 'NEW PRODUCT', title: '[예시] 새로운 맛 출시 소식', color: '#ffd43b' },
-    { tag: 'COLLABORATION', title: '[예시] 브랜드 협업 프로젝트', color: '#ff9ebd' },
-    { tag: 'CAMPAIGN', title: '[예시] 계절 캠페인', color: '#7ed957' },
-    { tag: 'POP-UP', title: '[예시] 팝업 스토어 오픈', color: '#8fd3ff' },
-    { tag: 'BRAND FILM', title: '[예시] 브랜드 필름 공개', color: '#e8542f' },
+    { tag: 'NEW PRODUCT', title: '[예시] 새로운 맛 출시 소식', image: '/images/today-new-product.jpg', color: '#ffd43b' },
+    { tag: 'COLLABORATION', title: '[예시] 브랜드 협업 프로젝트', image: '/images/today-collaboration.jpg', color: '#ff9ebd' },
+    { tag: 'CAMPAIGN', title: '[예시] 계절 캠페인', image: '/images/today-campaign.jpg', color: '#7ed957' },
+    { tag: 'POP-UP', title: '[예시] 팝업 스토어 오픈', image: '/images/today-popup.jpg', color: '#8fd3ff' },
+    { tag: 'BRAND FILM', title: '[예시] 브랜드 필름 공개', image: '/images/today-brand-film.jpg', color: '#e8542f' },
   ],
 }
 

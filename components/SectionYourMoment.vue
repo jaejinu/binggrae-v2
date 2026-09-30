@@ -2,6 +2,9 @@
 import gsap from 'gsap'
 import { brand, products, yourMoment } from '~/data/content'
 
+const root = ref<HTMLElement>()
+useSectionColor(root, () => ({ bg: '#7ed957' }))
+
 // 10. 참여형 콘텐츠 — 이유 하나 고르고 한 줄 쓰면 그래픽 카드 생성
 const reason = ref(0)
 const text = ref('')
@@ -90,7 +93,7 @@ function wrap(g: CanvasRenderingContext2D, s: string, x: number, y: number, max:
 </script>
 
 <template>
-  <section id="your-moment" class="ym section container">
+  <section id="your-moment" ref="root" class="ym section container">
     <div class="section-head">
       <span class="kicker">09 — Your Binggrae Moment</span>
       <h2 class="ko-display size-xl sticker-text">{{ yourMoment.title }}</h2>
@@ -154,9 +157,6 @@ function wrap(g: CanvasRenderingContext2D, s: string, x: number, y: number, max:
 </template>
 
 <style scoped>
-.ym {
-  background: var(--green);
-}
 .ym__grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
