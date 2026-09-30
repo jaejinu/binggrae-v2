@@ -1,3 +1,34 @@
+/*
+ * 빙그레 공식 서체 (빙그레체 / 빙그레 싸만코체)
+ * 빙그레 공식 배포처에서 받은 파일을 public/fonts/ 에 넣으면 적용됩니다. 없으면 아래 대체 폰트가 쓰입니다.
+ * 라이선스: 무료·상업적 사용 가능, 수정 및 재배포 금지 → 파일을 가공하지 말고 받은 그대로 사용하세요.
+ * PC에 설치되어 있으면 local()로도 인식합니다.
+ */
+@font-face {
+  font-family: 'Binggrae';
+  font-weight: 400;
+  font-display: swap;
+  src: local('Binggrae'), local('빙그레체'),
+    url('/fonts/Binggrae.woff2') format('woff2'), url('/fonts/Binggrae.woff') format('woff'),
+    url('/fonts/Binggrae.otf') format('opentype'), url('/fonts/Binggrae.ttf') format('truetype');
+}
+@font-face {
+  font-family: 'Binggrae';
+  font-weight: 700;
+  font-display: swap;
+  src: local('Binggrae Bold'), local('빙그레체 Bold'),
+    url('/fonts/Binggrae-Bold.woff2') format('woff2'), url('/fonts/Binggrae-Bold.woff') format('woff'),
+    url('/fonts/Binggrae-Bold.otf') format('opentype'), url('/fonts/Binggrae-Bold.ttf') format('truetype');
+}
+@font-face {
+  font-family: 'Binggrae Samanco';
+  font-weight: 400;
+  font-display: swap;
+  src: local('Binggrae Samanco Bold'), local('빙그레 싸만코체 Bold'),
+    url('/fonts/BinggraeSamanco-Bold.woff2') format('woff2'), url('/fonts/BinggraeSamanco-Bold.woff') format('woff'),
+    url('/fonts/BinggraeSamanco-Bold.otf') format('opentype'), url('/fonts/BinggraeSamanco-Bold.ttf') format('truetype');
+}
+
 :root {
   --ink: #1a1a1a;
   --cream: #fff6e0;
@@ -7,7 +38,9 @@
   --sky: #8fd3ff;
   --red: #e8542f;
   --green: #7ed957;
-  --font-ko-display: 'Black Han Sans', 'Pretendard Variable', system-ui, sans-serif;
+  /* 빙그레 서체가 있으면 우선 사용, 없으면 Black Han Sans */
+  --font-ko-display: 'Binggrae Samanco', 'Black Han Sans', 'Pretendard Variable', system-ui, sans-serif;
+  --font-ko-sub: 'Binggrae', 'Pretendard Variable', system-ui, sans-serif;
   --font-en-display: 'Anton', 'Black Han Sans', Impact, sans-serif;
   --font-body: 'Pretendard Variable', Pretendard, -apple-system, system-ui, sans-serif;
   --gutter: clamp(16px, 2.6vw, 44px);
@@ -102,6 +135,7 @@ button {
 }
 
 .body-l {
+  font-family: var(--font-ko-sub);
   font-size: clamp(16px, 1.25vw, 20px);
   line-height: 1.55;
   font-weight: 500;

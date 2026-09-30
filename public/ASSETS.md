@@ -9,4 +9,10 @@
 | `public/models/` | `yoplait.glb`, `samanco.glb`, `bravo.glb`, `banana-milk.glb` | LOOK CLOSER 3D (파트가 분리된 모델이면 Explode 가능) |
 | `public/images/` | `time-package.jpg`, `time-ad.jpg`, `time-photo.jpg`, `time-now.jpg` | TIME WITH BINGGRAE (4:5) |
 | `public/images/` | `story-design.jpg`, `story-color.jpg`, `story-naming.jpg`, `story-memory.jpg`, `story-culture.jpg` | STORIES 커버 |
+| `public/fonts/` | `Binggrae.(woff2\|otf\|ttf)`, `Binggrae-Bold.*`, `BinggraeSamanco-Bold.*` | 빙그레체(본문 보조) / 빙그레 싸만코체(한글 제목) — 공식 배포 파일을 **수정 없이** 파일명만 맞춰 넣기 |
 | `public/images/` | `today-new-product.jpg`, `today-collaboration.jpg`, `today-campaign.jpg`, `today-popup.jpg`, `today-brand-film.jpg` | TODAY 카드 (1:1) |
+
+## 폰트 라이선스 메모
+
+빙그레 서체는 무료·상업적 사용이 가능하지만 **수정 및 재배포가 금지**되어 있습니다.
+공식 배포처에서 직접 내려받아 사용하고, 폰트 파일을 공개 저장소에 올리는 것은 피하세요.
