@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import gsap from 'gsap'
-import { brand, products, yourMoment, type ProductKey } from '~/data/content'
+import { brand, momentProducts, yourMoment, type ProductKey } from '~/data/content'
 
 const root = ref<HTMLElement>()
 useSectionColor(root, () => ({ bg: '#7ed957' }))
@@ -8,7 +8,9 @@ useSectionColor(root, () => ({ bg: '#7ed957' }))
 // 10. 참여형 콘텐츠 — 이유 하나 고르고 한 줄 쓰면 그래픽 카드 생성
 const reason = ref(0)
 const text = ref('')
-const chosen=useState<ProductKey>('chosen-product',()=> 'bananaMilk')
+const primaryChosen = useState<ProductKey>('chosen-product', () => 'bananaMilk')
+const ownChoice = ref<string>()
+const chosen = computed({ get: () => ownChoice.value ?? primaryChosen.value, set: (key: string) => { ownChoice.value = key } })
 const colors=['#fff6e0','#ffd43b','#ff9ebd','#8fd3ff']
 const color=ref(colors[0]!)
 const downloadStatus=ref('')
@@ -22,7 +24,7 @@ const STORAGE_KEY = 'binggrae-moments'
 onMounted(() => {
   try {
     const stored: unknown = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]')
-    saved.value = Array.isArray(stored) ? stored.filter(s => s && Number.isInteger(s.reason) && yourMoment.reasons[s.reason] && Number.isInteger(s.product) && products[s.product] && typeof s.text === 'string' && typeof s.date === 'string').slice(0, 6) : []
+    saved.value = Array.isArray(stored) ? stored.filter(s => s && Number.isInteger(s.reason) && yourMoment.reasons[s.reason] && Number.isInteger(s.product) && momentProducts[s.product] && typeof s.text === 'string' && typeof s.date === 'string').slice(0, 6) : []
   } catch {
     saved.value = []
   }
@@ -34,7 +36,7 @@ async function make() {
   card.value = {
     reason: reason.value,
     text: text.value.trim().slice(0, 40) || '그냥, 오늘은 괜찮은 날.',
-    product: Math.max(0,products.findIndex(p=>p.key===chosen.value)),
+    product: Math.max(0,momentProducts.findIndex(p=>p.key===chosen.value)),
     color:color.value,
     date: `${now.getFullYear()}.${String(now.getMonth() + 1).padStart(2, '0')}.${String(now.getDate()).padStart(2, '0')}`,
   }
@@ -44,7 +46,7 @@ async function make() {
   } catch {
     /* 저장 불가 환경은 무시 */
   }
-  physics.value?.drop(products[card.value.product].key)
+  physics.value?.drop(momentProducts[card.value.product].key)
   await nextTick()
   gsap.fromTo(cardEl.value!, { scale: 0.4, rotate: -20, opacity: 0 }, { scale: 1, rotate: -3, opacity: 1, duration: prefersReducedMotion() ? 0 : 0.7, ease: 'back.out(2)', overwrite: true })
 }
@@ -82,8 +84,8 @@ async function download() {
   wrap(g, `“${card.value.text}”`, 140, 790, W - 280, 68)
   g.font = '44px "Black Han Sans", sans-serif'
   g.fillText(brand.name, 140, H - 160)
-  const img=new Image();img.src=products[card.value.product]!.image
-  try{await img.decode();g.drawImage(img,690,1000,245,255)}catch{downloadStatus.value='제품 이미지 로드에 실패했어요. 다시 저장해 주세요.';return}
+  const img=new Image();img.src=momentProducts[card.value.product]!.image
+  try{await img.decode();const scale=Math.min(245/img.naturalWidth,255/img.naturalHeight);const w=img.naturalWidth*scale,h=img.naturalHeight*scale;g.drawImage(img,690+(245-w)/2,1000+(255-h)/2,w,h)}catch{downloadStatus.value='제품 이미지 로드에 실패했어요. 다시 저장해 주세요.';return}
   const a = document.createElement('a')
   a.href = c.toDataURL('image/png')
   a.download = 'binggrae-moment.png'
@@ -132,7 +134,7 @@ function wrap(g: CanvasRenderingContext2D, s: string, x: number, y: number, max:
           <input v-model="text" class="ym__input" maxlength="40" :placeholder="yourMoment.placeholder" />
           <span class="ym__count body-m">{{ text.length }}/40</span>
         </label>
-        <fieldset class="ym__reasons"><legend class="kicker">03. 함께할 제품</legend><button v-for="p in products" :key="p.key" type="button" class="btn btn--sm" :aria-pressed="chosen===p.key" :style="chosen===p.key?{background:p.bg,color:p.ink}:undefined" @click="chosen=p.key">{{ p.nameKo }}</button></fieldset>
+        <fieldset class="ym__reasons"><legend class="kicker">03. 함께할 제품</legend><button v-for="p in momentProducts" :key="p.key" type="button" class="btn btn--sm" :aria-pressed="chosen===p.key" :style="chosen===p.key?{background:p.bg,color:p.ink}:undefined" @click="chosen=p.key">{{ p.nameKo }}</button></fieldset>
         <fieldset class="ym__reasons"><legend class="kicker">04. 오늘의 색</legend><button v-for="(c,i) in colors" :key="c" type="button" class="ym__swatch" :aria-label="['크림','노랑','핑크','파랑'][i]" :aria-pressed="color===c" :style="{background:c}" @click="color=c">{{ color===c?'✓':'' }}</button></fieldset>
         <button type="submit" class="btn btn--dark">카드 만들기 ✦</button><small>최근 카드는 이 브라우저에만 저장됩니다.</small>
       </form>
@@ -150,8 +152,9 @@ function wrap(g: CanvasRenderingContext2D, s: string, x: number, y: number, max:
           <p class="ko-display size-md">{{ yourMoment.reasons[card.reason].label }}</p>
           <p class="body-l">“{{ card.text }}”</p>
           <div class="ym__card-art" aria-hidden="true">
-            <ProductArt :product="products[card.product].key" />
+            <img :src="momentProducts[card.product].image" :alt="momentProducts[card.product].nameKo" class="ym__product-image" />
           </div>
+          <span class="ym__card-product body-m">함께한 맛 · {{ momentProducts[card.product].nameKo }}</span>
           <span class="ko-display ym__card-brand">{{ brand.name }}</span>
         </div>
         <p v-else class="ym__empty body-m">오늘의 순간을 골라보세요.<br />작은 카드가 만들어져요.</p>
@@ -260,6 +263,8 @@ function wrap(g: CanvasRenderingContext2D, s: string, x: number, y: number, max:
   aspect-ratio: 300 / 360;
   transform: rotate(12deg);
 }
+.ym__product-image { width: 100%; height: 100%; object-fit: contain; }
+.ym__card-product { position: relative; z-index: 1; font-size: 12px; }
 .ym__card-brand {
   margin-top: auto;
   font-size: 20px;

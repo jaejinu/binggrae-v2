@@ -10,10 +10,12 @@ useSectionColor(root, () => ({ bg: '#8fd3ff' }))
 onMounted(() => {
   ctx = gsap.context(() => {
   if (prefersReducedMotion()) return
-  gsap.from(root.value!.querySelectorAll('.today__card'), {
+  gsap.fromTo(root.value!.querySelectorAll('.today__card'), {
     y: 100,
     rotate: (i: number) => [-5, 4, -3, 5, -4][i % 5],
     opacity: 0,
+  }, {
+    y: 0, rotate: 0, opacity: 1, clearProps: 'transform,opacity',
     stagger: 0.1,
     duration: 0.8,
     ease: 'back.out(1.5)',
@@ -35,17 +37,20 @@ onMounted(() => {
       <div class="section-head">
         <span class="kicker">08 — Binggrae Today</span>
         <h2 class="ko-display size-xl sticker-text">{{ today.title }}</h2>
+        <p class="body-l">{{ today.description }}</p>
       </div>
       <div class="today__cards">
-        <a v-for="(item, i) in today.items" :key="item.tag" href="#" class="today__card card" data-cursor="VIEW" @click.prevent>
+        <article v-for="(item, i) in today.items" :key="item.tag" class="today__card card">
           <div class="today__thumb" :style="{ background: item.color }">
             <SparkleStar v-if="i % 2 === 0" class="today__spark" :size="26" />
-            <MediaSlot :src="item.image" :alt="item.title" />
+            <img :src="item.image" :alt="item.alt" width="1000" height="1000" loading="lazy" decoding="async" />
           </div>
           <span class="kicker">{{ item.tag }}</span>
+          <h3 class="ko-display today__product">{{ item.product }}</h3>
           <p class="body-m">{{ item.title }}</p>
-        </a>
+        </article>
       </div>
+      <p class="today__note body-m">브랜드 리뉴얼을 위해 제작한 콘셉트 이미지와 콘텐츠입니다.</p>
     </div>
   </section>
 </template>
@@ -80,10 +85,6 @@ onMounted(() => {
   flex-direction: column;
   gap: 10px;
   padding: 12px;
-  transition: transform 0.2s;
-}
-.today__card:hover {
-  transform: translateY(-6px) rotate(-1deg);
 }
 .today__thumb {
   position: relative;
@@ -94,6 +95,10 @@ onMounted(() => {
   border-radius: 12px;
   overflow: hidden;
 }
+.today__thumb img { width: 100%; height: 100%; object-fit: cover; transition: transform .5s; }
+.today__card:hover .today__thumb img { transform: scale(1.045); }
+.today__product { font-size: clamp(22px, 2vw, 30px); }
+.today__note { margin-top: 24px; font-size: 13px; }
 .today__thumb .body-m {
   font-size: 12px;
   opacity: 0.55;

@@ -3,7 +3,7 @@ import * as THREE from 'three'
 import * as CANNON from 'cannon-es'
 import gsap from 'gsap'
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
-import { products, type ProductKey } from '~/data/content'
+import { products, momentProducts } from '~/data/content'
 
 // "오늘의 틈 모으기": 카드를 만들 때마다 3D 제품이 떨어져 쌓이고, 커서로 밀 수 있다.
 const host = ref<HTMLDivElement>()
@@ -11,12 +11,13 @@ const ready = ref(false)
 const MAX = 22
 const SIZE = 1.45 // 제품 높이 (월드 단위)
 
-let dropImpl: ((key?: ProductKey, x?: number) => void) | undefined
+const selected = ref('random')
+let dropImpl: ((key?: string, x?: number) => void) | undefined
 let cleanup: (() => void) | undefined
 let disposed = false
 const unavailable = ref(false)
 
-function drop(key?: ProductKey) {
+function drop(key?: string) {
   dropImpl?.(key)
 }
 defineExpose({ drop })
@@ -103,7 +104,9 @@ onMounted(async () => {
   const ro = new ResizeObserver(resize)
   ro.observe(el)
   resize()
+  const stickerResources: { geometry: THREE.PlaneGeometry; material: THREE.MeshBasicMaterial; texture: THREE.CanvasTexture }[] = []
   const disposeBase = () => {
+    stickerResources.forEach(({ geometry, material, texture }) => { geometry.dispose(); material.dispose(); texture.dispose() })
     ro.disconnect()
     scene.environment?.dispose()
     floorMesh.geometry.dispose(); floorMesh.material.dispose(); sun.shadow.dispose()
@@ -120,13 +123,40 @@ onMounted(async () => {
     disposeBase(); cleanup = undefined
     return
   }
+  const stickers = new Map<string, { geometry: THREE.PlaneGeometry; material: THREE.MeshBasicMaterial; width: number; height: number }>()
+  await Promise.all(momentProducts.filter(p => !products.some(icon => icon.key === p.key)).map(async p => {
+    try {
+      const canvas = await loadProductSticker(p.image)
+      if (disposed) return
+      const texture = new THREE.CanvasTexture(canvas)
+      texture.colorSpace = THREE.SRGBColorSpace
+      const scale = SIZE / Math.max(canvas.width, canvas.height)
+      const width = canvas.width * scale, height = canvas.height * scale
+      const geometry = new THREE.PlaneGeometry(width, height)
+      const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, alphaTest: .05, side: THREE.DoubleSide, toneMapped: false })
+      stickerResources.push({ geometry, material, texture })
+      stickers.set(p.key, { geometry, material, width, height })
+    } catch { /* One unavailable image should not block the other products. */ }
+  }))
+  if (disposed) return
+  const availableKeys = momentProducts.map(p => p.key).filter(k => keys.includes(k as typeof keys[number]) || stickers.has(k))
+  el.dataset.products = availableKeys.join(',')
   ready.value = true
 
-  interface Item { body: CANNON.Body; obj: THREE.Object3D }
+  interface Item { key: string; body: CANNON.Body; obj: THREE.Object3D; sticker: boolean; dispose: () => void }
   const items: Item[] = []
 
-  const makeItem = (key: ProductKey) => {
-    const rig = makeRig(gltfs[keys.indexOf(key)]!, key, { size: SIZE, tilt: false })
+  const makeItem = (key: string): Item => {
+    const sticker = stickers.get(key)
+    if (sticker) {
+      const obj = new THREE.Mesh(sticker.geometry, sticker.material)
+      const body = new CANNON.Body({ mass: .7, material: mat, shape: new CANNON.Box(new CANNON.Vec3(sticker.width / 2, sticker.height / 2, .12)), angularDamping: .45, linearDamping: .2, allowSleep: true, sleepSpeedLimit: .2, sleepTimeLimit: .6 })
+      body.angularFactor.set(0, 0, 1)
+      body.linearFactor.set(1, 1, 0)
+      return { key, body, obj, sticker: true, dispose: () => {} }
+    }
+    const iconKey = key as typeof keys[number]
+    const rig = makeRig(gltfs[keys.indexOf(iconKey)]!, iconKey, { size: SIZE, tilt: false, cloneMaterials: true })
     rig.group.traverse((o) => ((o as THREE.Mesh).isMesh ? ((o as THREE.Mesh).castShadow = true) : null))
     // 충돌체: 모델 크기에 맞춘 원기둥/상자
     const box = new THREE.Box3().setFromObject(rig.group)
@@ -138,18 +168,20 @@ onMounted(async () => {
         ? new CANNON.Box(new CANNON.Vec3(size.x / 2, size.y / 2, size.z / 2))
         : new CANNON.Cylinder(Math.min(size.x, size.z) * 0.42, Math.min(size.x, size.z) * 0.42, size.y, 12)
     const body = new CANNON.Body({ mass: 1, material: mat, shape, angularDamping: 0.3, linearDamping: 0.1, allowSleep: true, sleepSpeedLimit: .2, sleepTimeLimit: .6 })
-    return { body, obj: rig.group }
+    return { key, body, obj: rig.group, sticker: false, dispose: () => {
+      rig.group.traverse(o => { const m = o as THREE.Mesh; if (m.isMesh) (Array.isArray(m.material) ? m.material : [m.material]).forEach(material => material.dispose()) })
+    } }
   }
 
   dropImpl = (key, x) => {
     if (disposed) return
     dirty = true
     lastInteraction = performance.now()
-    const k = key ?? keys[Math.floor(Math.random() * keys.length)]
+    const k = key && availableKeys.includes(key) ? key : availableKeys[Math.floor(Math.random() * availableKeys.length)]
     const it = makeItem(k)
     it.body.position.set(x ?? (Math.random() - 0.5) * halfW * 1.4, halfH + 2.5, (Math.random() - 0.5) * 0.6)
-    it.body.quaternion.setFromEuler(Math.random() * 0.6, Math.random() * Math.PI, (Math.random() - 0.5) * 1.2)
-    it.body.angularVelocity.set((Math.random() - 0.5) * 4, (Math.random() - 0.5) * 4, (Math.random() - 0.5) * 4)
+    it.body.quaternion.setFromEuler(it.sticker ? 0 : Math.random() * 0.6, it.sticker ? 0 : Math.random() * Math.PI, (Math.random() - 0.5) * 1.2)
+    it.body.angularVelocity.set(it.sticker ? 0 : (Math.random() - 0.5) * 4, it.sticker ? 0 : (Math.random() - 0.5) * 4, (Math.random() - 0.5) * 4)
     world.addBody(it.body)
     scene.add(it.obj)
     gsap.from(it.obj.scale, { x: 0.3, y: 0.3, z: 0.3, duration: 0.4, ease: 'back.out(2)' })
@@ -157,8 +189,10 @@ onMounted(async () => {
     if (items.length > (mobile ? 8 : MAX)) {
       const old = items.shift()!
       world.removeBody(old.body)
-      gsap.to(old.obj.scale, { x: 0, y: 0, z: 0, duration: 0.3, onComplete: () => scene.remove(old.obj) })
+      gsap.to(old.obj.scale, { x: 0, y: 0, z: 0, duration: 0.3, onComplete: () => { scene.remove(old.obj); old.dispose() } })
     }
+    el.dataset.lastProduct = k
+    el.dataset.activeProducts = items.map(item => item.key).join(',')
   }
 
   // ---- 커서로 밀기 ----
@@ -186,7 +220,7 @@ onMounted(async () => {
   const onLeave = () => { pusher.position.set(0, -50, 0); pusher.velocity.setZero() }
   const onClick = (e: PointerEvent) => {
     const p = toWorld(e)
-    dropImpl?.(undefined, p ? THREE.MathUtils.clamp(p.x, -halfW + 0.6, halfW - 0.6) : undefined)
+    dropImpl?.(selected.value === 'random' ? undefined : selected.value, p ? THREE.MathUtils.clamp(p.x, -halfW + 0.6, halfW - 0.6) : undefined)
   }
   el.addEventListener('pointermove', onMove)
   el.addEventListener('pointerleave', onLeave)
@@ -199,7 +233,8 @@ onMounted(async () => {
     visible = entry.isIntersecting
     if (visible && !started) {
       started = true
-      keys.forEach((k, i) => gsap.delayedCall(0.25 * i, () => dropImpl?.(k)))
+      const initial = mobile ? ['bananaMilk', 'melona', 'together', 'kkotgerang', 'excellent', 'bbangtttoa', 'ttaom', 'jucyCool'] : availableKeys
+      initial.filter(k => availableKeys.includes(k)).forEach((k, i) => gsap.delayedCall(0.2 * i, () => dropImpl?.(k)))
     }
   })
   io.observe(el)
@@ -226,7 +261,7 @@ onMounted(async () => {
 
   cleanup = () => {
     dropImpl = undefined
-    items.forEach(({ obj }) => { gsap.killTweensOf(obj.scale); obj.traverse(o => { const m = o as THREE.Mesh; if (m.isMesh) (Array.isArray(m.material) ? m.material : [m.material]).forEach(mat => mat.dispose()) }) })
+    items.forEach(item => { gsap.killTweensOf(item.obj.scale); item.dispose() })
     gsap.ticker.remove(tick)
     io.disconnect()
     el.removeEventListener('pointermove', onMove)
@@ -241,11 +276,19 @@ onBeforeUnmount(() => { disposed = true; cleanup?.() })
 
 <template>
   <div v-show="!unavailable" class="phys card">
-    <div ref="host" class="phys__canvas" data-cursor="PUSH" />
     <p class="phys__hint body-m">
       <span class="kicker">오늘의 틈 모으기</span>
-      {{ ready ? '카드를 만들 때마다 하나씩 떨어져요. 클릭하면 더, 마우스로 밀어보세요.' : '불러오는 중…' }}
+      {{ ready ? '16가지 즐거움. 제품을 골라 담거나 화면을 눌러 모아보세요.' : '불러오는 중…' }}
     </p>
+    <div ref="host" class="phys__canvas" data-cursor="PUSH" />
+    <div class="phys__controls">
+      <label for="collect-product">함께 모을 제품</label>
+      <select id="collect-product" v-model="selected">
+        <option value="random">랜덤으로 만나기</option>
+        <option v-for="p in momentProducts" :key="p.key" :value="p.key">{{ p.nameKo }}</option>
+      </select>
+      <button type="button" class="btn btn--sm" :disabled="!ready" @click="drop(selected === 'random' ? undefined : selected)">하나 더 담기 ＋</button>
+    </div>
   </div>
 </template>
 
@@ -256,6 +299,9 @@ onBeforeUnmount(() => { disposed = true; cleanup?.() })
   overflow: hidden;
   background: linear-gradient(#fff6e0, #fdeec8);
 }
+.phys__controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px; padding: 14px; border-top: 2px solid var(--ink); background: var(--cream); }
+.phys__controls label { font-size: 13px; }
+.phys__controls select { min-height: 44px; max-width: 100%; padding: 8px 12px; border: 2px solid var(--ink); border-radius: 12px; background: white; font: inherit; font-size: 14px; }
 .phys__canvas {
   height: clamp(280px, 38vh, 420px);
   touch-action: pan-y;
@@ -264,9 +310,8 @@ onBeforeUnmount(() => { disposed = true; cleanup?.() })
   display: block;
 }
 .phys__hint {
-  position: absolute;
-  left: 18px;
-  top: 14px;
+  position: relative;
+  margin: 14px 18px 0;
   display: flex;
   flex-direction: column;
   gap: 4px;

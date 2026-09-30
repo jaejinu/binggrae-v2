@@ -180,14 +180,32 @@ export const featured = {
 
 export const today = {
   title: '빙그레는 오늘도 새로운 틈을 만듭니다.',
+  description: '네 가지 아이콘 너머, 더 다양한 맛과 함께 만나는 새로운 즐거움.',
   items: [
-    { tag: 'NEW PRODUCT', title: '[예시] 새로운 맛 출시 소식', image: '/images/today-new-product.jpg', color: '#ffd43b' },
-    { tag: 'COLLABORATION', title: '[예시] 브랜드 협업 프로젝트', image: '/images/today-collaboration.jpg', color: '#ff9ebd' },
-    { tag: 'CAMPAIGN', title: '[예시] 계절 캠페인', image: '/images/today-campaign.jpg', color: '#7ed957' },
-    { tag: 'POP-UP', title: '[예시] 팝업 스토어 오픈', image: '/images/today-popup.jpg', color: '#8fd3ff' },
-    { tag: 'BRAND FILM', title: '[예시] 브랜드 필름 공개', image: '/images/today-brand-film.jpg', color: '#e8542f' },
+    { tag: 'NEW PRODUCT', product: '메로나', title: '초록빛으로 여는 새로운 틈', image: '/images/today-new-product.jpg', alt: '메론 조각과 초록빛 아이스크림 바를 배치한 메로나 콘셉트 이미지', color: '#cfe78e' },
+    { tag: 'COLLABORATION', product: '꽃게랑', title: '바삭한 즐거움이 일상 속 굿즈로', image: '/images/today-collaboration.jpg', alt: '꽃게 모양 키링과 자수가 있는 분홍색 가방의 협업 콘셉트 이미지', color: '#ff9ebd' },
+    { tag: 'CAMPAIGN', product: '투게더', title: '함께 떠먹는 오후의 작은 행복', image: '/images/today-campaign.jpg', alt: '햇살 아래 바닐라 아이스크림과 딸기를 나누는 투게더 캠페인 콘셉트 이미지', color: '#ffd43b' },
+    { tag: 'POP-UP', product: '엑설런트', title: '금빛 한 입을 만나는 작은 공간', image: '/images/today-popup.jpg', alt: '파란 차양과 금빛 아이스크림 포장을 전시한 엑설런트 팝업 콘셉트 이미지', color: '#8fd3ff' },
+    { tag: 'BRAND FILM', product: '바나나맛우유', title: '단지 하나에 담긴 오늘의 장면', image: '/images/today-brand-film.jpg', alt: '노을빛 창가의 단지 모양 우유와 필름 카메라 콘셉트 이미지', color: '#e8542f' },
   ],
 }
+
+// The four 3D icons stay separate. Append card-only products to keep saved card indices stable.
+export const momentProducts = [
+  ...products.map(({ key, nameKo, image, bg, ink }) => ({ key: key as string, nameKo, image, bg, ink })),
+  { key: 'melona', nameKo: '메로나', image: '/products/more/melona.png', bg: '#cfe78e', ink: '#1a1a1a' },
+  { key: 'together', nameKo: '투게더', image: '/products/more/together.png', bg: '#f2d4c4', ink: '#1a1a1a' },
+  { key: 'excellent', nameKo: '엑설런트', image: '/products/more/excellent.png', bg: '#c4d9ff', ink: '#1a1a1a' },
+  { key: 'kkotgerang', nameKo: '꽃게랑', image: '/products/more/kkotgerang.png', bg: '#ffbd88', ink: '#1a1a1a' },
+  {"key": "bibibig", "nameKo": "비비빅", "image": "/products/more/bibibig.png", "bg": "#fff6e0", "ink": "#1a1a1a"},
+  {"key": "bbangtttoa", "nameKo": "빵또아", "image": "/products/more/bbangtttoa.png", "bg": "#fff6e0", "ink": "#1a1a1a"},
+  {"key": "yomamte", "nameKo": "요맘때", "image": "/products/more/yomamte.png", "bg": "#fff6e0", "ink": "#1a1a1a"},
+  {"key": "cledor", "nameKo": "끌레도르", "image": "/products/more/cledor.png", "bg": "#fff6e0", "ink": "#1a1a1a"},
+  {"key": "deowisanyang", "nameKo": "더위사냥", "image": "/products/more/deowisanyang.png", "bg": "#fff6e0", "ink": "#1a1a1a"},
+  {"key": "ttaom", "nameKo": "따옴", "image": "/products/more/ttaom.png", "bg": "#fff6e0", "ink": "#1a1a1a"},
+  {"key": "acafela", "nameKo": "아카페라 사이즈업", "image": "/products/more/acafela.png", "bg": "#fff6e0", "ink": "#1a1a1a"},
+  {"key": "jucyCool", "nameKo": "쥬시쿨", "image": "/products/more/jucyCool.png", "bg": "#fff6e0", "ink": "#1a1a1a"},
+]
 
 export const yourMoment = {
   title: '오늘 너를 빙그레하게 한 건?',

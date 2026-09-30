@@ -329,5 +329,28 @@
       "nuxt typecheck and git diff --check"
     ],
     "target": "https://binggrae-moment.vercel.app"
+  },
+  "todayAndCollection": {
+    "date": "2026-09-30",
+    "scope": [
+      "5 generated TODAY concept images",
+      "16 card/collection product choices; primary 3D icons remain 4",
+      "12 official product pack shots rendered as lightweight physical stickers",
+      "Direct product selection and random addition in collection"
+    ],
+    "validation": [
+      "Chrome desktop 1440px and mobile 384px; WebKit mobile 384px",
+      "All 16 products loaded and added with matching selected key",
+      "Mobile pile sleeps after interaction, stable canvas pixels, wakes after tap",
+      "Five 1000px TODAY images decode; titles and layouts visually inspected",
+      "New product card creation and PNG export",
+      "Independent original 3D inspector still operates",
+      "No page errors or horizontal overflow in tested viewports",
+      "nuxt typecheck and git diff --check"
+    ],
+    "limitations": [
+      "Emulation only; not physical-device coverage",
+      "TODAY visuals are clearly identified as concepts, not actual releases/events"
+    ]
   }
 }
