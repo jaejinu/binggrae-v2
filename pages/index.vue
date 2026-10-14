@@ -4,15 +4,27 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger'
 
 const entered = useState('entered-site', () => false)
 const started = ref(false)
-const { init, stop, start, destroy, scrollTo } = useSmoothScroll()
+const { init, stop, start, destroy, scrollTo, resetToTop } = useSmoothScroll()
 const { bg, ink } = usePageColor()
 let ctx: gsap.Context | undefined
 let disposed = false
+let previousRestoration: ScrollRestoration | undefined
+
+function resetEntrance() {
+  // Entry always starts at the schedule, even from a saved #moments link.
+  if (location.hash) history.replaceState(history.state, '', location.pathname + location.search)
+  resetToTop()
+}
 
 onMounted(async () => {
   init()
   started.value = entered.value
-  if (!started.value) stop()
+  if (!started.value) {
+    previousRestoration = history.scrollRestoration
+    history.scrollRestoration = 'manual'
+    stop()
+    resetEntrance()
+  }
 
   // 섹션 제목류는 화면에 들어올 때 톡 튀어나오게
   ctx = gsap.context(() => {
@@ -29,15 +41,23 @@ onMounted(async () => {
   await document.fonts.ready
   if (disposed) return
   ScrollTrigger.refresh()
-  if (started.value && location.hash) scrollTo(location.hash)
+  if (!started.value) resetEntrance()
+  else if (entered.value && location.hash) scrollTo(location.hash)
 })
-onBeforeUnmount(() => { disposed = true; ctx?.revert(); destroy() })
+onBeforeUnmount(() => {
+  disposed = true
+  if (previousRestoration !== undefined) history.scrollRestoration = previousRestoration
+  ctx?.revert()
+  destroy()
+})
 
 function onStart() {
+  resetEntrance()
+  ScrollTrigger.refresh()
+  resetToTop()
   started.value = true
   entered.value = true
   start()
-  if (location.hash) scrollTo(location.hash)
 }
 </script>
 

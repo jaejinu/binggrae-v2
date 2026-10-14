@@ -72,17 +72,17 @@ async function download() {
   g.lineWidth = 8
   g.strokeRect(80, 100, W - 160, H - 200)
   g.fillStyle = '#1a1a1a'
-  g.font = '64px Anton, sans-serif'
-  g.fillText('MY BINGGRAE MOMENT', 140, 220)
+  g.font = '600 56px "Pretendard Variable", sans-serif'
+  g.fillText('MY BINGGRAE MOMENT', 140, 220, W - 280)
   g.font = '40px "Pretendard Variable", sans-serif'
   g.fillText(card.value.date, 140, 290)
-  g.font = '150px "Black Han Sans", sans-serif'
+  g.font = '150px "Pretendard Variable", sans-serif'
   g.fillText(r.emoji, 140, 540)
-  g.font = '84px "Black Han Sans", sans-serif'
+  g.font = '600 84px "Pretendard Variable", sans-serif'
   g.fillText(r.label, 140, 680)
   g.font = '500 48px "Pretendard Variable", sans-serif'
   wrap(g, `“${card.value.text}”`, 140, 790, W - 280, 68)
-  g.font = '44px "Black Han Sans", sans-serif'
+  g.font = '600 44px "Pretendard Variable", sans-serif'
   g.fillText(brand.name, 140, H - 160)
   const img=new Image();img.src=momentProducts[card.value.product]!.image
   try{await img.decode();const scale=Math.min(245/img.naturalWidth,255/img.naturalHeight);const w=img.naturalWidth*scale,h=img.naturalHeight*scale;g.drawImage(img,690+(245-w)/2,1000+(255-h)/2,w,h)}catch{downloadStatus.value='제품 이미지 로드에 실패했어요. 다시 저장해 주세요.';return}
@@ -107,7 +107,7 @@ function wrap(g: CanvasRenderingContext2D, s: string, x: number, y: number, max:
 </script>
 
 <template>
-  <section id="your-moment" ref="root" class="ym section container">
+  <section id="your-moment" ref="root" class="content-section ym section container">
     <div class="section-head">
       <span class="kicker">09 — Your Binggrae Moment</span>
       <h2 class="ko-display size-xl sticker-text">{{ yourMoment.title }}</h2>
@@ -159,12 +159,12 @@ function wrap(g: CanvasRenderingContext2D, s: string, x: number, y: number, max:
         </div>
         <p v-else class="ym__empty body-m">오늘의 순간을 골라보세요.<br />작은 카드가 만들어져요.</p>
         <button v-if="card" class="btn" @click="download">이미지로 저장 ↓</button><p role="status">{{ downloadStatus }}</p>
+        <ClientOnly>
+          <MomentPhysics ref="physics" />
+        </ClientOnly>
       </div>
     </div>
 
-    <ClientOnly>
-      <MomentPhysics ref="physics" />
-    </ClientOnly>
 
     <div v-if="saved.length > 1" class="ym__wall">
       <span class="kicker">최근에 만든 카드</span>
@@ -181,26 +181,27 @@ function wrap(g: CanvasRenderingContext2D, s: string, x: number, y: number, max:
 .ym__swatch{width:44px;height:44px;border:2px solid #1a1a1a;border-radius:50%;font-size:22px;color:#1a1a1a}.ym__swatch[aria-pressed="true"]{outline:2px solid #1a1a1a;outline-offset:3px}
 .ym__grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: clamp(24px, 4vw, 64px);
   align-items: start;
 }
 .ym__form {
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 24px;
-  padding: clamp(20px, 3vw, 36px);
+  gap: 16px;
+  padding: clamp(18px, 2vw, 24px);
 }
 .ym__reasons {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 6px;
   margin: 0;
   padding: 0;
   border: 0;
 }
 .ym__reasons legend {
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 .ym__label {
   position: relative;
@@ -209,7 +210,9 @@ function wrap(g: CanvasRenderingContext2D, s: string, x: number, y: number, max:
   gap: 10px;
 }
 .ym__input {
-  min-height: 56px;
+  width: 100%;
+  min-width: 0;
+  min-height: 48px;
   padding: 0 64px 0 18px;
   border: var(--stroke) solid var(--ink);
   border-radius: 14px;
@@ -232,28 +235,27 @@ function wrap(g: CanvasRenderingContext2D, s: string, x: number, y: number, max:
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 18px;
+  gap: 12px;
 }
 .ym__card {
   position: relative;
-  width: min(100%, 380px);
-  aspect-ratio: 4 / 5;
-  min-height: 480px;
+  width: min(100%, 300px);
+  min-height: 390px;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 28px;
+  padding: 20px;
   background: var(--cream);
   box-shadow: 10px 10px 0 var(--c), 12px 12px 0 var(--ink);
   transform: rotate(-3deg);
   overflow: hidden;
 }
 .ym__card-kicker {
-  font-size: 20px;
+  font-size: 16px;
 }
 .ym__emoji {
-  font-size: 56px;
-  margin-top: 12px;
+  font-size: 32px;
+  margin-top: 4px;
 }
 .ym__card-art {
   position: absolute;
@@ -269,11 +271,11 @@ function wrap(g: CanvasRenderingContext2D, s: string, x: number, y: number, max:
   margin-top: auto;
   font-size: 20px;
 }
-.ym__card > .body-l { overflow-wrap: anywhere; word-break: break-word; padding-bottom: 72px; }
+.ym__card > .body-l { overflow-wrap: anywhere; word-break: break-word; padding-bottom: 40px; }
 .ym__empty {
   display: grid;
   place-items: center;
-  width: min(100%, 380px);
+  width: min(100%, 300px);
   aspect-ratio: 4 / 5;
   border: var(--stroke) dashed var(--ink);
   border-radius: 18px;
@@ -302,7 +304,14 @@ function wrap(g: CanvasRenderingContext2D, s: string, x: number, y: number, max:
 @media (max-width: 900px) {
   .ym__swatch{width:44px;height:44px;border:2px solid #1a1a1a;border-radius:50%;font-size:22px;color:#1a1a1a}.ym__swatch[aria-pressed="true"]{outline:2px solid #1a1a1a;outline-offset:3px}
 .ym__grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
+</style>
+
+<style scoped>
+.ym__result { min-width: 0; }
+.ym__result > [role="status"]:empty { display: none; }
+.ym__result :deep(.phys) { width: 100%; margin-top: 12px; }
+.ym__result :deep(.phys__canvas) { height: 200px; }
 </style>

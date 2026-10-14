@@ -28,6 +28,12 @@ export function useSmoothScroll() {
   return {
     init,
     scrollTo,
+    resetToTop: () => {
+      // Synchronize Lenis as well as native scrolling, including a locked intro.
+      if (lenis) lenis.scrollTo(0, { immediate: true, force: true })
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
+      ScrollTrigger.update()
+    },
     stop: () => { if (nativeTouch) document.documentElement.classList.add('touch-scroll-stopped'); else lenis?.stop() },
     start: () => { document.documentElement.classList.remove('touch-scroll-stopped'); lenis?.start() },
     destroy: () => { document.documentElement.classList.remove('touch-scroll-stopped'); gsap.ticker.remove(tick); lenis?.destroy(); lenis = null; nativeTouch = false },

@@ -166,7 +166,7 @@ onBeforeUnmount(() => media?.revert())
   width: 100vw;
   height: 100%;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   align-items: center;
   padding: 120px var(--gutter) 60px;
   overflow: hidden;
@@ -175,13 +175,13 @@ onBeforeUnmount(() => media?.revert())
   position: absolute;
   left: 6%;
   top: 50%;
-  width: min(52vw, 70vh);
+  width: min(42vw, 58vh);
   translate: 0 -50%;
 }
 .icon-panel__art {
   position: relative;
   justify-self: center;
-  width: min(30vw, 44vh);
+  width: min(24vw, 36vh);
   aspect-ratio: 300 / 360;
 }
 .icon-panel__text {
@@ -193,8 +193,11 @@ onBeforeUnmount(() => media?.revert())
   z-index: 1;
 }
 .icon-panel__name {
-  font-size: clamp(56px, 9vw, 168px);
-  white-space: nowrap;
+  font-size: clamp(40px, 5.2vw, 80px);
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .icon-panel__desc {
   max-width: 360px;
@@ -203,7 +206,7 @@ onBeforeUnmount(() => media?.revert())
   position: absolute;
   right: var(--gutter);
   bottom: -0.12em;
-  font-size: clamp(120px, 22vw, 380px);
+  font-size: clamp(96px, 16vw, 240px);
   opacity: 0.12;
   pointer-events: none;
 }
@@ -223,7 +226,7 @@ onBeforeUnmount(() => media?.revert())
     translate: -50% -50%;
   }
   .icon-panel__name {
-    font-size: clamp(48px, 15vw, 96px);
+    font-size: clamp(36px, 10vw, 64px);
   }
 }
 </style>
@@ -262,7 +265,7 @@ onBeforeUnmount(() => media?.revert())
   .icons--animated .icon-panel { grid-template-columns: 1fr; align-content: center; gap: 10px; padding: 100px var(--gutter) 110px; }
   .icons--animated .icon-panel__art { width: min(40vw, 23svh); }
   .icons--animated .icon-panel__text { gap: 7px; }
-  .icons--animated .icon-panel__name { font-size: clamp(38px, 12vw, 68px); }
+  .icons--animated .icon-panel__name { font-size: clamp(32px, 9vw, 52px); }
   .icons--animated .icon-panel__desc { font-size: 14px; }
   .icons--animated .icon-panel__text .size-md { font-size: 24px; }
   .icons--animated .icons__touch-nav { position: absolute; bottom: 0; left: 0; right: 0; z-index: 45; padding: 10px var(--gutter) max(12px, env(safe-area-inset-bottom)); }
@@ -271,7 +274,7 @@ onBeforeUnmount(() => media?.revert())
   .icons--animated .icons__touch-nav button { min-height: 44px; padding: 4px; font-size: 11px; white-space: normal; }
 }
 @media (max-height: 500px) and (orientation: landscape) {
-  .icons--animated .icon-panel { grid-template-columns: 1fr 1fr; padding: 90px var(--gutter) 90px; gap: 12px; }
+  .icons--animated .icon-panel { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); padding: 90px var(--gutter) 90px; gap: 12px; }
   .icons--animated .icon-panel__art { width: min(22vw, 45svh); }
   .icons--animated .icon-panel__name { font-size: 38px; }
   .icons--animated .icon-panel__text { gap: 3px; }

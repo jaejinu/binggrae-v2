@@ -47,10 +47,10 @@ watch(productKey, async () => {
 </script>
 
 <template>
-  <section id="look-closer" ref="root" class="look section container">
+  <section id="look-closer" ref="root" class="content-section look section container">
     <div class="section-head">
       <span class="kicker">04 — Why We Remember</span>
-      <h2 class="ko-display size-xl sticker-text">제품에는<br />기억될 이유가 있다</h2>
+      <h2 class="ko-display size-xl sticker-text">제품에는 기억될 이유가 있다</h2>
     </div>
 
     <div class="look__tabs" role="tablist" aria-label="탐험할 제품" @keydown="tabKey">
@@ -118,7 +118,7 @@ watch(productKey, async () => {
 </template>
 
 <style scoped>
-.look__play{display:grid;gap:14px;padding:22px;color:#1a1a1a;width:100%}.look__play h3{font-size:24px}.look__play label{display:grid;gap:10px}.look__play input{width:100%;accent-color:#ed3025}.look__sides{display:flex;gap:8px}.look__play p{line-height:1.6}
+.look__play{display:grid;gap:10px;padding:18px;color:#1a1a1a;width:100%}.look__play h3{font-size:20px}.look__play label{display:grid;gap:10px}.look__play input{width:100%;accent-color:#ed3025}.look__sides{display:flex;gap:8px}.look__play p{line-height:1.6}
 .look__touch-controls { display: none; }
 .look__tabs {
   display: flex;
@@ -128,14 +128,14 @@ watch(productKey, async () => {
 }
 .look__grid {
   display: grid;
-  grid-template-columns: 1.15fr 1fr;
-  gap: clamp(24px, 4vw, 64px);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: clamp(24px, 2.5vw, 40px);
   align-items: center;
 }
 .look__stage {
   position: relative;
-  aspect-ratio: 1;
-  max-height: 72vh;
+  height: clamp(320px, 44vh, 420px);
+  min-width: 0;
   overflow: hidden;
   color: var(--ink);
 }
@@ -162,7 +162,7 @@ watch(productKey, async () => {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 18px;
+  gap: 12px;
 }
 .look__details {
   list-style: none;
@@ -199,7 +199,7 @@ watch(productKey, async () => {
 
 <style scoped>
 @media (pointer: coarse), (max-width: 800px) {
-  .look__stage { aspect-ratio: auto; height: 430px; max-height: none; }
+  .look__stage { aspect-ratio: auto; height: 380px; max-height: none; }
   .look__stage :deep(.product-scene) { bottom: 112px; }
   .look__modes { bottom: 64px; gap: 5px; }
   .look__modes .btn { padding-inline: 10px; }
@@ -207,5 +207,15 @@ watch(productKey, async () => {
   .look__touch-controls button { flex-shrink: 0; min-height: 44px; }
   .look__touch-controls input { min-width: 0; width: 100%; height: 44px; accent-color: #ed3025; touch-action: none; }
   .look__hint { font-size: 11px; }
+}
+</style>
+
+<style scoped>
+.look { padding-block: clamp(64px, 9vh, 96px); }
+.look__stage :deep(.product-scene) { inset: 28px 12px 62px; }
+.look__text { min-width: 0; }
+.look__q { font-size: clamp(24px, calc(var(--content-unit) * 2.8), 34px); }
+@media (pointer: coarse), (max-width: 800px) {
+  .look__stage :deep(.product-scene) { inset: 30px 8px 112px; }
 }
 </style>

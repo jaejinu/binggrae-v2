@@ -2,15 +2,12 @@
 // 이미지가 있으면 보여주고, 없으면 "이미지 자리" 플레이스홀더를 보여준다.
 const props = defineProps<{ src?: string; alt?: string; label?: string }>()
 const ok = useImageAvailable(() => props.src)
-// 파일 경로 안내는 개발 중에만 표시
-const showPath = import.meta.dev
 </script>
 
 <template>
   <img v-if="ok" :src="src" :alt="alt ?? ''" class="media-slot__img" loading="lazy" />
   <span v-else class="media-slot__placeholder">
     <slot>{{ label ?? '이미지 자리' }}</slot>
-    <code v-if="src && showPath" class="media-slot__path">{{ src }}</code>
   </span>
 </template>
 

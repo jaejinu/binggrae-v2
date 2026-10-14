@@ -26,7 +26,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <section id="today" ref="root" class="today section">
+  <section id="today" ref="root" class="content-section today section">
     <div class="today__marquee" aria-hidden="true">
       <div class="today__marquee-inner en-display">
         <span v-for="n in 2" :key="n">NEW PRODUCT ✦ COLLABORATION ✦ CAMPAIGN ✦ POP-UP ✦ BRAND FILM ✦&nbsp;</span>
@@ -60,7 +60,7 @@ onMounted(() => {
   overflow: hidden;
 }
 .today__marquee {
-  margin-bottom: clamp(48px, 8vh, 96px);
+  margin-bottom: 28px;
   border-block: var(--stroke) solid var(--ink);
   background: var(--banana);
   overflow: hidden;
@@ -68,7 +68,7 @@ onMounted(() => {
 .today__marquee-inner {
   display: flex;
   width: max-content;
-  font-size: clamp(28px, 3.4vw, 56px);
+  font-size: clamp(24px, calc(var(--content-unit) * 3.2), 42px);
   padding-block: 10px;
   animation: marquee 22s linear infinite;
 }
@@ -83,7 +83,7 @@ onMounted(() => {
 .today__card {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   padding: 12px;
 }
 .today__thumb {
@@ -97,7 +97,7 @@ onMounted(() => {
 }
 .today__thumb img { width: 100%; height: 100%; object-fit: cover; transition: transform .5s; }
 .today__card:hover .today__thumb img { transform: scale(1.045); }
-.today__product { font-size: clamp(22px, 2vw, 30px); }
+.today__product { font-size: clamp(18px, calc(var(--content-unit) * 2), 24px); }
 .today__note { margin-top: 24px; font-size: 13px; }
 .today__thumb .body-m {
   font-size: 12px;
@@ -113,5 +113,11 @@ onMounted(() => {
   .today__cards {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
+</style>
+
+<style scoped>
+@media (min-width: 1001px) and (max-width: 1400px) {
+  .today__cards { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 </style>

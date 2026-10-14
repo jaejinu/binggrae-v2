@@ -25,7 +25,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <section id="time" ref="root" class="time section container">
+  <section id="time" ref="root" class="content-section time section container">
     <div class="section-head">
       <span class="kicker">05 — Long Life Icons</span>
       <h2 class="en-display size-xl sticker-text">{{ timeline.title }}</h2>
@@ -80,7 +80,7 @@ onMounted(() => {
   overflow: hidden;
   display: grid;
   place-items: center;
-  aspect-ratio: 4 / 5;
+  aspect-ratio: 4 / 3;
   padding: 16px;
   text-align: center;
 }
@@ -112,9 +112,9 @@ onMounted(() => {
   font-size: 28px;
 }
 .time__cta {
-  margin-top: clamp(32px, 6vh, 64px);
+  margin-top: 28px;
 }
-@media (max-width: 900px) {
+@media (max-width: 1200px) {
   .time__source{font-size:12px;text-decoration:underline;display:inline-block;margin-top:12px}
 .time__list {
     grid-template-columns: repeat(2, minmax(0, 1fr));

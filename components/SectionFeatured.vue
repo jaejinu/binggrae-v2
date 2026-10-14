@@ -24,7 +24,7 @@ onMounted(() => {
       scrollTrigger: {
         trigger: pin.value,
         start: 'top top',
-        end: () => `+=${pin.value!.clientHeight * 3}`,
+        end: () => `+=${pin.value!.clientHeight * 1.5}`,
         pin: true,
         scrub: 0.6,
         onUpdate: (self) => {
@@ -42,7 +42,7 @@ onBeforeUnmount(() => media?.revert())
 </script>
 
 <template>
-  <section id="featured" ref="root" class="featured">
+  <section id="featured" ref="root" class="content-section featured">
     <div ref="pin" class="featured__pin container">
       <div class="featured__left">
         <span class="kicker">07 — {{ featured.kicker }}</span>
@@ -79,9 +79,9 @@ onBeforeUnmount(() => media?.revert())
   height: 100vh;
   height: 100svh;
   display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  grid-template-columns: minmax(0, 1.1fr) minmax(120px, .65fr) minmax(0, 1.2fr);
   align-items: center;
-  gap: clamp(20px, 3vw, 56px);
+  gap: clamp(20px, 2vw, 32px);
   overflow: hidden;
   padding-top: 72px;
 }
@@ -90,6 +90,9 @@ onBeforeUnmount(() => media?.revert())
   flex-direction: column;
   align-items: flex-start;
   gap: 20px;
+}
+.featured__left h2 {
+  font-size: clamp(28px, calc(var(--content-unit) * 3), 40px);
 }
 .featured__years {
   display: flex;
@@ -114,7 +117,9 @@ onBeforeUnmount(() => media?.revert())
   transform-origin: left;
 }
 .featured__jar {
-  width: clamp(160px, 20vw, 300px);
+  width: 100%;
+  max-width: 170px;
+  justify-self: center;
   aspect-ratio: 300 / 360;
 }
 .featured__chapters {
@@ -132,7 +137,7 @@ onBeforeUnmount(() => media?.revert())
   opacity: 0.4;
   transition: opacity 0.3s, background-color 0.3s, border-color 0.3s, transform 0.3s;
 }
-.featured__chapters button { display: grid; grid-template-columns: 7.2em 1fr; gap: 2px 12px; padding: 10px 14px; width: 100%; min-height: 48px; text-align: left; border-radius: 12px; }
+.featured__chapters button { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px 12px; padding: 10px 14px; width: 100%; min-height: 48px; text-align: left; border-radius: 12px; }
 .featured__chapters li.--past {
   opacity: 0.7;
 }
@@ -149,10 +154,10 @@ onBeforeUnmount(() => media?.revert())
   align-self: center;
 }
 .featured__title {
-  font-size: clamp(20px, 1.8vw, 28px);
+  font-size: clamp(18px, 1.6vw, 24px);
 }
 .featured__q {
-  grid-column: 2;
+  grid-column: 1;
   display: none;
 }
 .--active .featured__q {
@@ -222,5 +227,14 @@ onBeforeUnmount(() => media?.revert())
   .featured--animated .featured__jar { position: relative; grid-column: 2; grid-row: 1; height: 110px; }
   .featured--animated .featured__chapters { grid-column: 3; grid-row: 1; }
   .featured--animated .featured__touch-note { grid-column: 1 / -1; grid-row: 2; }
+}
+</style>
+
+<style scoped>
+@media (min-width: 1001px) and (min-height: 701px) {
+  .featured__pin.featured--animated {
+    height: clamp(600px, 80svh, 760px);
+    padding-block: 40px;
+  }
 }
 </style>

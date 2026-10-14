@@ -45,7 +45,8 @@ onMounted(() => {
     const els = gsap.utils.toArray<HTMLElement>('.hero__token')
     let shifts = computeShifts(els)
 
-    gsap.set(els, { opacity: 0, yPercent: 60 })
+    // Keep schedule text visible by default; only its entrance position animates.
+    gsap.set(els, { yPercent: props.started ? 0 : 60 })
 
     gsap
       .timeline({
@@ -64,7 +65,7 @@ onMounted(() => {
       })
       .to('.hero__intro', { opacity: 0, y: -40, duration: 0.25 }, 0)
       .to(els, { x: (_i: number, el: HTMLElement) => shifts.get(el) ?? 0, ease: 'power2.inOut', duration: 1 }, 0)
-      .to(els, { opacity: 0.08, duration: 0.5 }, 0.45)
+      .fromTo(els, { opacity: 1 }, { opacity: 0.08, duration: 0.5, immediateRender: false }, 0.45)
       .fromTo('.hero__product', { scale: 0, rotate: -30 }, { scale: 1, rotate: 0, ease: 'back.out(1.6)', duration: 0.6 }, 0.5)
       .fromTo('.hero__spark', { scale: 0 }, { scale: 1, stagger: 0.05, duration: 0.3, ease: 'back.out(3)' }, 0.75)
       .fromTo('.hero__tag-line', { yPercent: 100, opacity: 0 }, { yPercent: 0, opacity: 1, stagger: 0.06, duration: 0.18 }, 0.64)
@@ -78,7 +79,7 @@ watch(
     if (!on) return
     if (prefersReducedMotion()) return
     ctx?.add(() => {
-    gsap.to(root.value!.querySelectorAll('.hero__token'), { yPercent: 0, opacity: 1, duration: 0.7, stagger: { each: 0.02, from: 'random' }, ease: 'back.out(1.6)' })
+    gsap.to(root.value!.querySelectorAll('.hero__token'), { yPercent: 0, duration: 0.7, stagger: { each: 0.02, from: 'random' }, ease: 'back.out(1.6)' })
     gsap.from(root.value!.querySelectorAll('.hero__intro > *'), { scale: 0.4, opacity: 0, delay: 0.5, stagger: 0.1, ease: 'back.out(2)' })
     })
   },
@@ -114,6 +115,10 @@ onBeforeUnmount(() => ctx?.revert())
         <span class="hero__tag-line --l">{{ brand.tagline[0] }}</span>
         <span class="hero__tag-line --r">{{ brand.tagline[1] }}</span>
       </p>
+      <p class="hero__disclaimer">
+        <span lang="en">PERSONAL CONCEPT PROJECT · UNOFFICIAL</span>
+        <span>본 프로젝트는 (주)빙그레와 관련이 없는 개인 포트폴리오 작업입니다.</span>
+      </p>
     </div>
   </section>
 </template>
@@ -139,7 +144,7 @@ onBeforeUnmount(() => ctx?.revert())
   display: inline-flex;
   align-items: flex-start;
   gap: 4px;
-  font-family: var(--font-ko-display);
+  font-family: var(--font-brand);
   font-size: clamp(34px, 7vw, 124px);
   line-height: 1;
   white-space: nowrap;
@@ -160,7 +165,7 @@ onBeforeUnmount(() => ctx?.revert())
 .hero__intro {
   position: absolute;
   left: 50%;
-  bottom: clamp(24px, 6vh, 64px);
+  bottom: max(88px, calc(76px + env(safe-area-inset-bottom)));
   translate: -50% 0;
   display: flex;
   flex-direction: column;
@@ -178,6 +183,27 @@ onBeforeUnmount(() => ctx?.revert())
   padding: 4px 12px;
   border-radius: 999px;
   animation: nudge 1.4s ease-in-out infinite;
+}
+.hero__disclaimer {
+  position: absolute;
+  z-index: 2;
+  bottom: max(16px, env(safe-area-inset-bottom));
+  left: var(--gutter);
+  right: var(--gutter);
+  margin: 0;
+  color: var(--ink);
+  font-size: 11px;
+  line-height: 1.6;
+  text-align: center;
+  word-break: keep-all;
+}
+.hero__disclaimer span {
+  display: block;
+}
+.hero__disclaimer [lang="en"] {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
 }
 @keyframes nudge {
   50% { transform: translateY(6px); }
@@ -248,7 +274,7 @@ onBeforeUnmount(() => ctx?.revert())
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  html:not([data-motion="full"]) .hero__schedule { opacity: .08; }
+  html:not([data-motion="full"]) .hero__schedule { opacity: 1; }
   html:not([data-motion="full"]) .hero__product { transform: none; }
   html:not([data-motion="full"]) .hero__spark { display: none; }
   html:not([data-motion="full"]) .hero__intro { z-index: 1; }

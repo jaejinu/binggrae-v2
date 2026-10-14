@@ -98,7 +98,7 @@ async function go(href: string) {
 .header__side {
   display: flex;
   align-items: center;
-  gap: clamp(14px, 2vw, 32px);
+  gap: clamp(8px, 1.2vw, 20px);
 }
 .header__side.--end {
   justify-content: flex-end;
@@ -106,7 +106,8 @@ async function go(href: string) {
 .header__link {
   position: relative;
   font-family: var(--font-en-display);
-  font-size: 15px;
+  font-size: 13px;
+  white-space: nowrap;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   padding: 6px 12px;
@@ -119,8 +120,6 @@ async function go(href: string) {
 }
 .header__link:hover {
   background: var(--banana);
-  height: 100dvh;
-  overflow-y: auto;
   transform: translateY(-2px);
 }
 .header__logo {

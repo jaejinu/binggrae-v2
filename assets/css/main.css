@@ -1,28 +1,18 @@
-/*
- * 빙그레 공식 서체 (빙그레체 / 빙그레 싸만코체)
- * 로컬 설치된 공식 서체를 우선 사용합니다. 배포 파일이 없는 URL은 요청하지 않습니다.
- * 라이선스: 무료·상업적 사용 가능, 수정 및 재배포 금지 → 파일을 가공하지 말고 받은 그대로 사용하세요.
- * PC에 설치되어 있으면 local()로도 인식합니다.
- */
+/* Original Binggrae font files, shared with the existing teum concept. */
 @font-face {
   font-family: 'Binggrae';
+  src: url('/fonts/Binggrae.ttf') format('truetype');
   font-weight: 400;
+  font-style: normal;
   font-display: swap;
-  src: local('Binggrae'), local('빙그레체');
 }
 @font-face {
   font-family: 'Binggrae';
+  src: url('/fonts/Binggrae-Bold.ttf') format('truetype');
   font-weight: 700;
+  font-style: normal;
   font-display: swap;
-  src: local('Binggrae Bold'), local('빙그레체 Bold');
 }
-@font-face {
-  font-family: 'Binggrae Samanco';
-  font-weight: 400;
-  font-display: swap;
-  src: local('Binggrae Samanco Bold'), local('빙그레 싸만코체 Bold');
-}
-
 :root {
   --ink: #1a1a1a;
   --cream: #fff6e0;
@@ -32,11 +22,12 @@
   --sky: #8fd3ff;
   --red: #e8542f;
   --green: #7ed957;
-  /* 빙그레 서체가 있으면 우선 사용, 없으면 Black Han Sans */
-  --font-ko-display: 'Binggrae Samanco', 'Black Han Sans', 'Pretendard Variable', system-ui, sans-serif;
-  --font-ko-sub: 'Binggrae', 'Pretendard Variable', system-ui, sans-serif;
-  --font-en-display: 'Anton', 'Black Han Sans', Impact, sans-serif;
+  /* Brand type for key messages; Pretendard for reading and controls. */
+  --font-brand: 'Binggrae', 'Pretendard Variable', sans-serif;
   --font-body: 'Pretendard Variable', Pretendard, -apple-system, system-ui, sans-serif;
+  --font-ko-display: var(--font-body);
+  --font-ko-sub: var(--font-body);
+  --font-en-display: var(--font-body);
   --gutter: clamp(16px, 2.6vw, 44px);
   --stroke: 2.5px;
   --shadow: 4px 4px 0 var(--ink);
@@ -93,30 +84,32 @@ button {
 /* ---- Type ---- */
 .ko-display {
   font-family: var(--font-ko-display);
-  font-weight: 400;
-  line-height: 1.05;
-  letter-spacing: -0.01em;
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.035em;
   margin: 0;
 }
 .en-display {
   font-family: var(--font-en-display);
-  font-weight: 400;
+  font-weight: 600;
   text-transform: uppercase;
-  line-height: 0.9;
+  line-height: 1.1;
   letter-spacing: 0.005em;
   margin: 0;
 }
-.size-xxl { font-size: clamp(64px, 11vw, 200px); }
-.size-xl { font-size: clamp(44px, 6.4vw, 116px); }
-.size-lg { font-size: clamp(32px, 4vw, 68px); }
-.size-md { font-size: clamp(22px, 2.2vw, 36px); }
+.size-xxl { font-size: clamp(48px, 7vw, 104px); }
+.size-xl { font-size: clamp(34px, 4.4vw, 68px); }
+.size-lg { font-size: clamp(28px, 3vw, 44px); }
+.size-md { font-size: clamp(21px, 1.8vw, 28px); }
 
 .kicker {
   display: inline-flex;
   align-items: center;
   gap: 8px;
   font-family: var(--font-en-display);
-  font-size: 15px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -192,13 +185,13 @@ button {
 
 .section {
   position: relative;
-  padding-block: clamp(96px, 16vh, 180px);
+  padding-block: clamp(64px, 10vh, 112px);
 }
 .section-head {
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  margin-bottom: clamp(36px, 6vh, 72px);
+  gap: 12px;
+  margin-bottom: clamp(24px, 4vh, 44px);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -211,4 +204,57 @@ button {
 :focus-visible { outline: 3px solid #3d63dd; outline-offset: 5px; }
 @media (prefers-reduced-motion: reduce) {
   html:not([data-motion="full"]) *, html:not([data-motion="full"]) *::before, html:not([data-motion="full"]) *::after { animation-iteration-count: 1 !important; scroll-behavior: auto !important; }
+}
+
+/* Content headings retain the section color without heavy sticker outlines. */
+.section h2.sticker-text,
+.featured__left h2.sticker-text,
+.icon-panel__name.sticker-text {
+  color: inherit;
+  -webkit-text-stroke: 0;
+  text-shadow: none;
+}
+
+/* Keep hero and horizontal icon panels full width; center the other sections. */
+.content-section {
+  --content-unit: min(0.75vw, 14.4px);
+  width: min(75%, 1440px);
+  margin-inline: auto;
+  padding-inline: 0;
+}
+.content-section > .container {
+  padding-inline: 0;
+}
+@media (max-width: 1100px) {
+  .content-section {
+    --content-unit: calc((100vw - var(--gutter) * 2) / 100);
+    width: calc(100% - var(--gutter) * 2);
+  }
+}
+
+/* Scale content type with its 75% column, not the full viewport. */
+.content-section .size-xl { font-size: clamp(30px, calc(var(--content-unit) * 4.4), 56px); }
+.content-section .size-lg { font-size: clamp(25px, calc(var(--content-unit) * 3), 36px); }
+.content-section .size-md { font-size: clamp(20px, calc(var(--content-unit) * 2.2), 26px); }
+.content-section h2,
+.hero__question,
+.hero__tagline,
+.header__logo,
+.pre__center > .ko-display,
+.look__q,
+.icon-panel__name,
+.ym__card-brand {
+  font-family: var(--font-brand);
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.035em;
+}
+.content-section .section-head { gap: 10px; margin-bottom: 28px; }
+.content-section .btn { font-size: 14px; min-height: 44px; padding-inline: 16px; }
+.content-section .btn--sm { font-size: 12px; min-height: 36px; padding-inline: 12px; }
+.content-section .body-l { font-size: clamp(15px, calc(var(--content-unit) * 1.5), 18px); }
+
+/* Later sections keep a compact vertical rhythm inside the centered column. */
+:is(#time, #stories, #today, #your-moment, #news).section {
+  padding-block: clamp(48px, 7vh, 72px);
 }

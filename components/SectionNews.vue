@@ -6,7 +6,7 @@ useSectionColor(root, () => ({ bg: '#fff6e0' }))
 </script>
 
 <template>
-  <section id="news" ref="root" class="news section container">
+  <section id="news" ref="root" class="content-section news section container">
     <div class="section-head news__head">
       <span class="kicker">10 — News / Notice</span>
       <h2 class="en-display size-xl">News</h2>
@@ -36,7 +36,7 @@ useSectionColor(root, () => ({ bg: '#fff6e0' }))
   grid-template-columns: 8em 1fr auto 2em;
   align-items: center;
   gap: 20px;
-  padding: 22px 8px;
+  padding: 16px 8px;
   border-bottom: var(--stroke) solid var(--ink);
   transition: background-color 0.2s, padding 0.3s;
 }

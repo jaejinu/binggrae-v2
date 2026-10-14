@@ -39,10 +39,10 @@ onMounted(() => {
 </script>
 
 <template>
-  <section id="moments" ref="root" class="moments section container">
+  <section id="moments" ref="root" class="content-section moments section container">
     <div class="section-head">
       <span class="kicker">02 — Your Binggrae Moment</span>
-      <h2 class="ko-display size-xl sticker-text">하루의 순간으로<br />제품 발견하기</h2>
+      <h2 class="moments__title ko-display">하루의 순간으로<br />제품 발견하기</h2>
     </div>
 
     <div class="moments__grid">
@@ -79,10 +79,25 @@ onMounted(() => {
 </template>
 
 <style scoped>
+.moments {
+  color: var(--ink);
+  padding-block: clamp(64px, 9vh, 104px);
+}
+.moments .section-head {
+  gap: 12px;
+  margin-bottom: clamp(24px, 3.5vh, 40px);
+}
+.moments__title {
+  font-family: var(--font-brand);
+  font-size: clamp(30px, calc(var(--content-unit) * 4.4), 56px);
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.04em;
+}
 .moments__grid {
   display: grid;
-  grid-template-columns: 1.2fr 1fr;
-  gap: clamp(24px, 4vw, 72px);
+  grid-template-columns: minmax(0, 48%) minmax(0, 1fr);
+  gap: clamp(24px, 3vw, 48px);
   align-items: center;
 }
 .moments__list {
@@ -95,10 +110,10 @@ onMounted(() => {
 .moments__item {
   width: 100%;
   display: grid;
-  grid-template-columns: 7.5em 1fr auto;
+  grid-template-columns: 5.5em minmax(0, 1fr) auto;
   align-items: baseline;
-  gap: 16px;
-  padding: clamp(14px, 2vh, 22px) 0;
+  gap: 12px;
+  padding: clamp(12px, 1.6vh, 16px) 0;
   border-top: var(--stroke) solid currentColor;
   text-align: left;
   opacity: 0.55;
@@ -116,21 +131,29 @@ li:last-child .moments__item {
   letter-spacing: 0.06em;
 }
 .moments__label {
-  font-size: clamp(24px, 2.8vw, 46px);
+  font-family: var(--font-ko-sub);
+  font-size: clamp(21px, calc(var(--content-unit) * 2.4), 28px);
+  font-weight: 500;
+  line-height: 1.25;
 }
 .moments__name {
-  font-size: clamp(14px, 1.1vw, 18px);
+  font-family: var(--font-body);
+  font-size: clamp(12px, 0.95vw, 15px);
+  font-weight: 500;
+  line-height: 1.3;
   letter-spacing: 0.06em;
 }
 .moments__panel {
   position: relative;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 40%) minmax(0, 1fr);
   align-items: center;
   gap: 16px;
-  padding: clamp(20px, 3vw, 40px);
+  padding: clamp(20px, 2vw, 28px);
   color: var(--ink);
-  min-height: 380px;
+  min-height: 270px;
+  border-width: 2px;
+  box-shadow: 3px 3px 0 var(--ink);
 }
 .moments__spark {
   position: absolute;
@@ -138,15 +161,24 @@ li:last-child .moments__item {
   top: -14px;
 }
 .moments__art {
+  width: 85%;
+  max-width: 150px;
+  justify-self: center;
   aspect-ratio: 300 / 360;
 }
 .moments__detail {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
+}
+.moments__detail .ko-display {
+  font-family: var(--font-ko-sub);
+  font-size: clamp(22px, 1.8vw, 28px);
+  font-weight: 500;
+  line-height: 1.25;
 }
 .moments__note {
-  margin-top: 32px;
+  margin-top: 20px;
   opacity: 0.8;
 }
 @media (max-width: 900px) {
@@ -161,13 +193,17 @@ li:last-child .moments__item {
   }
 }
 @media (max-width: 480px) {
+  .moments__spark {
+    right: -6px;
+  }
   .moments__panel {
     grid-template-columns: 1fr;
     justify-items: center;
     text-align: center;
   }
   .moments__art {
-    width: 60%;
+    width: 52%;
+    max-width: 150px;
   }
 }
 </style>
